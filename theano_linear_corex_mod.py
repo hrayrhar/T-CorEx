@@ -102,13 +102,13 @@ class Corex:
 
         # v_xi | z conditional mean
         outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-        inner_term_1 = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1)).reshape((1, self.m, self.nv))
+        inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
         inner_term_2 = self.z.reshape((ns, self.m, 1))
         # TODO: use discourage overlap ?
         cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
         # objective
-        obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), 1, np.inf)).sum(axis=0)
+        obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
         obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
         self.obj = obj_part_1 + obj_part_2
 
@@ -439,7 +439,7 @@ def main():
         df = pd.DataFrame(pkl.load(f))
     print("Data.shape = {}".format(df.shape))
 
-    corex = Corex(nv=df.shape[1], n_hidden=10, max_iter=2000, verbose=True, anneal=False)
+    corex = Corex(nv=df.shape[1], n_hidden=10, max_iter=300, verbose=True, anneal=True)
     corex.fit(df[:200])
 
 
