@@ -49,12 +49,13 @@ def mean_impute(x, v):
     return np.array(x_new).T, np.array(n_obs)
 
 
-class Corex:
+class TimeCorex(object):
 
-    def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
+    def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0,
                  verbose=False, seed=None):
 
+        self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
         self.max_iter = max_iter  # Number of iterations to try
@@ -76,62 +77,76 @@ class Corex:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
-        self.history = {}  # Keep track of values for each iteration
+        self.history = [{} for t in range(self.nt)]  # Keep track of values for each iteration
         self.rng = RandomStreams(seed)
 
     def _define_model(self, anneal_eps):
 
-        self.x_wno = T.matrix('X')
-        ns = self.x_wno.shape[0]
-        self.anneal_noise = self.rng.normal(size=(ns, self.nv))
-        self.x = np.sqrt(1 - anneal_eps ** 2) * self.x_wno + anneal_eps * self.anneal_noise
-        self.z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
-        self.ws = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W')
-        self.z_mean = T.dot(self.x, self.ws.T)
-        self.z = self.z_mean + self.z_noise
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
 
-        EPS = 1e-6
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - anneal_eps ** 2) * self.x_wno[t] + anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
 
-        z2 = (self.z ** 2).mean(axis=0)  # (m,)
-        R = T.dot(self.z.T, self.x) / ns  # m, nv
-        R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
-        ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+        EPS = 1e-5
+        self.obj = [None] * self.nt
 
-        # v_xi | z conditional mean
-        outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-        inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
-        inner_term_2 = self.z.reshape((ns, self.m, 1))
-        # TODO: use discourage overlap ?
-        cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+        for t in range(self.nt):
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
 
-        # objective
-        obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
-        obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
-        self.obj = obj_part_1 + obj_part_2
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.obj[t] = obj_part_1 + obj_part_2
+
+        self.total_obj = T.sum(self.obj)
 
         # optimizer
-        updates = lasagne.updates.adam(self.obj, [self.ws])
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
 
         # functions
-        self.train_step = theano.function(inputs=[self.x_wno],
-                                          outputs=[self.obj, self.z_mean],
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj] + self.obj,
                                           updates=updates)
 
     def fit(self, x):
-        x = np.asarray(x, dtype=np.float32)
+        x = [np.array(xt, dtype=np.float32) for xt in x]
         x = self.preprocess(x, fit=True)  # Fit a transform for each marginal
-        assert x.shape[1] == self.nv
+        self.x_std = x  # to have an access to standardalized x
 
         anneal_schedule = [0.]
         if self.anneal:
             anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
 
         for i_eps, eps in enumerate(anneal_schedule):
+            start_time = time.time()
+
             self.eps = eps
             if i_eps > 0:
-                old_ws = self.ws.get_value()
+                old_ws = [w.get_value() for w in self.ws]
                 self._define_model(eps)
-                self.ws.set_value(old_ws)
+                for t in range(self.nt):
+                    self.ws[t].set_value(old_ws[t])
             else:
                 self._define_model(eps)
 
@@ -139,51 +154,51 @@ class Corex:
             self._update_u(x)
 
             for i_loop in range(self.max_iter):
-                last_tc = self.tc  # Save this TC to compare to possible updates
+                last_tc = np.sum(self.tc)  # Save this TC to compare to possible updates
 
-                (obj, _) = self.train_step(x.astype(np.float32))
+                obj = self.train_step(*x)[0]
                 self.moments = self._calculate_moments(x, self.ws, quick=True)
                 self._update_u(x)
 
                 if i_loop % 10 == 0:
-                    print "tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps)
+                    print("tc = {}, obj = {}, eps = {}".format(np.sum(self.tc), obj, eps))
 
-                if not self.moments or not np.isfinite(self.tc):
+                if not self.moments or not np.isfinite(np.sum(self.tc)):
                     print("Error: TC is no longer finite: {}".format(self.tc))
 
-                delta = np.abs(self.tc - last_tc)
+                delta = np.abs(np.sum(self.tc) - last_tc)
                 self.update_records(self.moments, delta)  # Book-keeping
                 if delta < self.tol:  # Check for convergence
                     if self.verbose:
-                        print('{:d} iterations to tol: {:f}, tc: {}'.format(i_loop, self.tol, self.tc))
+                        print('{:d} iterations to tol: {:f}, Time: {}, TC: {}'.format(i_loop, self.tol,
+                                                                                      time.time() - start_time,
+                                                                                      np.sum(self.tc)))
                     break
             else:
                 if self.verbose:
                     print("Warning: Convergence not achieved in {:d} iterations. "
-                          "Final delta: {:f}, tc: {}".format(self.max_iter, delta, self.tc))
+                          "Final delta: {:f}, Time: {}, TC: {}".format(self.max_iter, delta,
+                                                                       time.time() - start_time,
+                                                                       np.sum(self.tc)))
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
-        order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
-
-        ws = self.ws.get_value()
-        ws = ws[order]
-        self.ws.set_value(ws)
-        self._update_u(x)
-
-        self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments based on sorted weights.
         return self
 
     def _update_u(self, x):
-        self.us = self.getus(self.ws.get_value(), x)
+        self.us = [self.getus(w.get_value(), xt) for w, xt in zip(self.ws, x)]
 
     def update_records(self, moments, delta):
         """Print and store some statistics about each iteration."""
         gc.disable()  # There's a bug that slows when appending, fixed by temporarily disabling garbage collection
-        self.history["TC"] = self.history.get("TC", []) + [moments["TC"]]
+        for t in range(self.nt):
+            self.history[t]["TC"] = self.history[t].get("TC", []) + [moments[t]["TC"]]
         if self.verbose > 1:
-            print("TC={:.3f}\tadd={:.3f}\tdelta={:.6f}".format(moments["TC"], moments.get("additivity", 0), delta))
+            tc_sum = sum([m["TC"] for m in moments])
+            add_sum = sum([m.get("additivity", 0) for m in moments])
+            print("TC={:.3f}\tadd={:.3f}\tdelta={:.6f}".format(tc_sum, add_sum, delta))
         if self.verbose:
-            self.history["additivity"] = self.history.get("additivity", []) + [moments.get("additivity", 0)]
-            self.history["TCs"] = self.history.get("TCs", []) + [moments.get("TCs", np.zeros(self.m))]
+            for t in range(self.nt):
+                self.history[t]["additivity"] = self.history[t].get("additivity", []) + [moments[t].get("additivity", 0)]
+                self.history[t]["TCs"] = self.history[t].get("TCs", []) + [moments[t].get("TCs", np.zeros(self.m))]
         gc.enable()
 
     @property
@@ -191,16 +206,16 @@ class Corex:
         """This actually returns the lower bound on TC that is optimized. The lower bound assumes a constraint that
          would be satisfied by a non-overlapping model.
          Check "moments" for two other estimates of TC that may be useful."""
-        return self.moments["TC"]
+        return [m["TC"] for m in self.moments]
 
     @property
     def tcs(self):
         """TCs for each individual latent factor. They DO NOT sum to TC in this case, because of overlaps."""
-        return self.moments["TCs"]
+        return [m["TCs"] for m in self.moments]
 
     @property
     def mis(self):
-        return - 0.5 * np.log1p(-self.moments["rho"] ** 2)
+        return [-0.5 * np.log1p(-m["rho"]**2) for m in self.moments]
 
     def clusters(self):
         return np.argmax(np.abs(self.us), axis=0)  # TODO: understand this
@@ -222,7 +237,7 @@ class Corex:
         else:
             y = x.dot(u.T)
             tmp_dot = x.T.dot(y)
-        prod = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * u  # nv by m,  <X_i Y_j> / std Y_j
+        prod = (1 - self.eps**2) * tmp_dot.T / n_samples + self.eps**2 * u  # nv by m,  <X_i Y_j> / std Y_j
         return prod
 
     def getus(self, w, x):
@@ -238,17 +253,20 @@ class Corex:
         return w / np.sqrt(z2).reshape((-1, 1))
 
     def _calculate_moments(self, x, ws, quick=False):
-        us = self.getus(ws.get_value(), x)
-        if self.discourage_overlap:
-            return self._calculate_moments_ns(x, us, quick=quick)
-        else:
-            return self._calculate_moments_syn(x, us, quick=quick)
+        us = [self.getus(w.get_value(), xt) for w, xt in zip(ws, x)]
+        ret = [None] * self.nt
+        for t in range(self.nt):
+            if self.discourage_overlap:
+                ret[t] = self._calculate_moments_ns(x[t], us[t], quick=quick)
+            else:
+                ret[t] = self._calculate_moments_syn(x[t], us[t], quick=quick)
+        return ret
 
     def _calculate_moments_ns(self, x, ws, quick=False):
         """Calculate moments based on the weights and samples. We also calculate and save MI, TC, additivity, and
         the value of the objective. Note it is assumed that <X_i^2> = 1! """
-        n_samples = x.shape[0]
         m = {}  # Dictionary of moments
+        n_samples = x.shape[0]
         if self.gpu:
             y = cm.empty((n_samples, self.m))
             wc = cm.CUDAMatrix(ws)
@@ -258,11 +276,7 @@ class Corex:
         else:
             y = x.dot(ws.T)
             tmp_sum = np.einsum('lj,lj->j', y, y)
-        m["uj"] = (1 - self.eps ** 2) * tmp_sum / n_samples + self.eps ** 2 * np.sum(ws ** 2, axis=1)
-
-        if np.max(m["uj"]) > 1.0:
-            print np.max(m["uj"])
-            assert False
+        m["uj"] = (1 - self.eps**2) * tmp_sum / n_samples + self.eps**2 * np.sum(ws**2, axis=1)
 
         if self.gpu:
             tmp = cm.empty((self.nv, self.m))
@@ -272,34 +286,32 @@ class Corex:
             del y
         else:
             tmp_dot = x.T.dot(y)
-        m["rho"] = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * ws  # m by nv
+        m["rho"] = (1 - self.eps**2) * tmp_dot.T / n_samples + self.eps**2 * ws  # m by nv
         m["ry"] = ws.dot(m["rho"].T)  # normalized covariance of Y
         m["Y_j^2"] = self.y_scale ** 2 / (1. - m["uj"])
         np.fill_diagonal(m["ry"], 1)
-        m["invrho"] = 1. / (1. - m["rho"] ** 2)
+        m["invrho"] = 1. / (1. - m["rho"]**2)
         m["rhoinvrho"] = m["rho"] * m["invrho"]
         m["Qij"] = np.dot(m['ry'], m["rhoinvrho"])
         m["Qi"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
-        # m["Qi-Si^2"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
+        #m["Qi-Si^2"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
         m["Si"] = np.sum(m["rho"] * m["rhoinvrho"], axis=0)
 
         # This is the objective, a lower bound for TC
         m["TC"] = np.sum(np.log(1 + m["Si"])) \
-                  - 0.5 * np.sum(np.log(1 - m["Si"] ** 2 + m["Qi"])) \
-                  + 0.5 * np.sum(np.log(1 - m["uj"]))
+                     - 0.5 * np.sum(np.log(1 - m["Si"]**2 + m["Qi"])) \
+                     + 0.5 * np.sum(np.log(1 - m["uj"]))
 
         if not quick:
-            m["MI"] = - 0.5 * np.log1p(-m["rho"] ** 2)
+            m["MI"] = - 0.5 * np.log1p(-m["rho"]**2)
             m["X_i Y_j"] = m["rho"].T * np.sqrt(m["Y_j^2"])
             m["X_i Z_j"] = np.linalg.solve(m["ry"], m["rho"]).T
             m["X_i^2 | Y"] = (1. - np.einsum('ij,ji->i', m["X_i Z_j"], m["rho"])).clip(1e-6)
             m['I(Y_j ; X)'] = 0.5 * np.log(m["Y_j^2"]) - 0.5 * np.log(self.y_scale ** 2)
             m['I(X_i ; Y)'] = - 0.5 * np.log(m["X_i^2 | Y"])
             m["TCs"] = m["MI"].sum(axis=1) - m['I(Y_j ; X)']
-            m["TC_no_overlap"] = m["MI"].max(axis=0).sum() - m[
-                'I(Y_j ; X)'].sum()  # A direct calculation of TC where each variable is in exactly one group.
-            m["TC_direct"] = m['I(X_i ; Y)'].sum() - m[
-                'I(Y_j ; X)']  # A direct calculation of TC. Should be upper bound for "TC", "TC_no_overlap"
+            m["TC_no_overlap"] = m["MI"].max(axis=0).sum() - m['I(Y_j ; X)'].sum()  # A direct calculation of TC where each variable is in exactly one group.
+            m["TC_direct"] = m['I(X_i ; Y)'].sum() - m['I(Y_j ; X)']  # A direct calculation of TC. Should be upper bound for "TC", "TC_no_overlap"
             m["additivity"] = (m["MI"].sum(axis=0) - m['I(X_i ; Y)']).sum()
         return m
 
@@ -310,48 +322,54 @@ class Corex:
         """Transform an array of inputs, x, into an array of k latent factors, Y.
             Optionally, you can get the remainder information and/or stop at a specified level."""
         x = self.preprocess(x)
-        ns, nv = x.shape
-        assert self.nv == nv, "Incorrect number of variables in input, %d instead of %d" % (nv, self.nv)
+        ret = [a.dot(w.get_value().T) for (a, w) in zip(x, self.ws)]
         if details:
             moments = self._calculate_moments(x, self.us)
-            return x.dot(self.us.T), moments
-        return x.dot(self.us.T)
+            return ret, moments
+        return ret
 
-    def preprocess(self, x, fit=False):
+    def preprocess(self, X, fit=False):
         """Transform each marginal to be as close to a standard Gaussian as possible.
         'standard' (default) just subtracts the mean and scales by the std.
         'empirical' does an empirical gaussianization (but this cannot be inverted).
         'outliers' tries to squeeze in the outliers
         Any other choice will skip the transformation."""
-        if self.missing_values is not None:
-            x, self.n_obs = mean_impute(x, self.missing_values)  # Creates a copy
-        else:
-            self.n_obs = len(x)
-        if self.gaussianize == 'none':
-            pass
-        elif self.gaussianize == 'standard':
-            if fit:
-                mean = np.mean(x, axis=0)
-                # std = np.std(x, axis=0, ddof=0).clip(1e-10)
-                std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / self.n_obs).clip(1e-10)
-                self.theta = (mean, std)
-            x = ((x - self.theta[0]) / self.theta[1])
-            if np.max(np.abs(x)) > 6 and self.verbose:
-                print("Warning: outliers more than 6 stds away from mean. Consider using gaussianize='outliers'")
-        elif self.gaussianize == 'outliers':
-            if fit:
-                mean = np.mean(x, axis=0)
-                std = np.std(x, axis=0, ddof=0).clip(1e-10)
-                self.theta = (mean, std)
-            x = g((x - self.theta[0]) / self.theta[1])  # g truncates long tails
-        elif self.gaussianize == 'empirical':
-            print("Warning: correct inversion/transform of empirical gauss transform not implemented.")
-            x = np.array([norm.ppf((rankdata(x_i) - 0.5) / len(x_i)) for x_i in x.T]).T
-        if self.gpu and fit:  # Don't return GPU matrices when only transforming
-            x = cm.CUDAMatrix(x)
-        return x
+        ret = [None] * len(X)
+        if fit:
+            self.theta = []
+        for t in range(len(X)):
+            x = X[t]
+            if self.missing_values is not None:
+                x, n_obs = mean_impute(x, self.missing_values)  # Creates a copy
+            else:
+                n_obs = len(x)
+            if self.gaussianize == 'none':
+                pass
+            elif self.gaussianize == 'standard':
+                if fit:
+                    mean = np.mean(x, axis=0)
+                    # std = np.std(x, axis=0, ddof=0).clip(1e-10)
+                    std = np.sqrt(np.sum((x - mean)**2, axis=0) / n_obs).clip(1e-10)
+                    self.theta.append((mean, std))
+                x = ((x - self.theta[t][0]) / self.theta[t][1])
+                if np.max(np.abs(x)) > 6 and self.verbose:
+                    print("Warning: outliers more than 6 stds away from mean. Consider using gaussianize='outliers'")
+            elif self.gaussianize == 'outliers':
+                if fit:
+                    mean = np.mean(x, axis=0)
+                    std = np.std(x, axis=0, ddof=0).clip(1e-10)
+                    self.theta.append((mean, std))
+                x = g((x - self.theta[t][0]) / self.theta[t][1])  # g truncates long tails
+            elif self.gaussianize == 'empirical':
+                print("Warning: correct inversion/transform of empirical gauss transform not implemented.")
+                x = np.array([norm.ppf((rankdata(x_i) - 0.5) / len(x_i)) for x_i in x.T]).T
+            if self.gpu and fit:  # Don't return GPU matrices when only transforming
+                x = cm.CUDAMatrix(x)
+            ret[t] = x
+        return ret
 
     def invert(self, x):
+        # TODO: consider timesteps
         """Invert the preprocessing step to get x's in the original space."""
         if self.gaussianize == 'standard':
             return self.theta[1] * x + self.theta[0]
@@ -361,21 +379,28 @@ class Corex:
             return x
 
     def predict(self, y):
-        return self.invert(np.dot(self.moments["X_i Z_j"], y.T).T)
+        # NOTE: not sure what does this function do
+        ret = [None] * self.nt
+        for t in range(self.nt):
+            ret[t] = self.invert(np.dot(self.moments[t]["X_i Z_j"], y[t].T).T)
+        return ret
 
     def get_covariance(self):
         # This uses E(Xi|Y) formula for non-synergistic relationships
         m = self.moments
-        if self.discourage_overlap:
-            z = m['rhoinvrho'] / (1 + m['Si'])
-            cov = np.dot(z.T, z)
-            cov /= (1. - self.eps ** 2)
-            np.fill_diagonal(cov, 1)
-            return self.theta[1][:, np.newaxis] * self.theta[1] * cov
-        else:
-            cov = np.einsum('ij,kj->ik', m["X_i Z_j"], m["X_i Y_j"])
-            np.fill_diagonal(cov, 1)
-            return self.theta[1][:, np.newaxis] * self.theta[1] * cov
+        ret = [None] * self.nt
+        for t in range(self.nt):
+            if self.discourage_overlap:
+                z = m[t]['rhoinvrho'] / (1 + m[t]['Si'])
+                cov = np.dot(z.T, z)
+                cov /= (1. - self.eps**2)
+                np.fill_diagonal(cov, 1)
+                ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
+            else:
+                cov = np.einsum('ij,kj->ik', m[t]["X_i Z_j"], mp[t]["X_i Y_j"])
+                np.fill_diagonal(cov, 1)
+                ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
+        return ret
 
 
 def main():
@@ -386,8 +411,20 @@ def main():
         df = pd.DataFrame(pkl.load(f))
     print("Data.shape = {}".format(df.shape))
 
-    corex = Corex(nv=df.shape[1], n_hidden=10, max_iter=300, verbose=True, anneal=True)
-    corex.fit(df[10:20])
+    #starts = [0, 5, 10]
+    starts = [10]
+    ends = [x + 10 for x in starts]
+    X = [df[s:e] for (s, e) in zip(starts, ends)]
+
+    corex = TimeCorex(nt=len(starts),
+                      nv=df.shape[1],
+                      n_hidden=10,
+                      max_iter=500,
+                      verbose=True,
+                      anneal=True)
+    corex.fit(X)
+
+    print(corex.tc)
 
 
 if __name__ == '__main__':
