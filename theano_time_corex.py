@@ -53,7 +53,7 @@ class TimeCorex(object):
 
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0,
-                 verbose=False, seed=None):
+                 verbose=False, seed=None, l1=0.0, l2=0.0):
 
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
@@ -77,6 +77,9 @@ class TimeCorex(object):
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
+        self.l1 = l1
+        self.l2 = l2
+
         self.history = [{} for t in range(self.nt)]  # Keep track of values for each iteration
         self.rng = RandomStreams(seed)
 
@@ -99,7 +102,7 @@ class TimeCorex(object):
             self.z[t] = self.z_mean[t] + z_noise
 
         EPS = 1e-5
-        self.obj = [None] * self.nt
+        self.objs = [None] * self.nt
 
         for t in range(self.nt):
             z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
@@ -117,16 +120,29 @@ class TimeCorex(object):
             # objective
             obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
             obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
-            self.obj[t] = obj_part_1 + obj_part_2
+            self.objs[t] = obj_part_1 + obj_part_2
 
-        self.total_obj = T.sum(self.obj)
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs(self.ws[t+1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
 
         # optimizer
         updates = lasagne.updates.adam(self.total_obj, self.ws)
 
         # functions
         self.train_step = theano.function(inputs=self.x_wno,
-                                          outputs=[self.total_obj] + self.obj,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
 
     def fit(self, x):
@@ -156,12 +172,15 @@ class TimeCorex(object):
             for i_loop in range(self.max_iter):
                 last_tc = np.sum(self.tc)  # Save this TC to compare to possible updates
 
-                obj = self.train_step(*x)[0]
+                ret = self.train_step(*x)
+                obj = ret[0]
+                reg_obj = ret[2]
                 self.moments = self._calculate_moments(x, self.ws, quick=True)
                 self._update_u(x)
 
                 if i_loop % 10 == 0:
-                    print("tc = {}, obj = {}, eps = {}".format(np.sum(self.tc), obj, eps))
+                    print("tc = {}, obj = {}, reg = {}, eps = {}".format(np.sum(self.tc),
+                                                                         obj, reg_obj, eps))
 
                 if not self.moments or not np.isfinite(np.sum(self.tc)):
                     print("Error: TC is no longer finite: {}".format(self.tc))
@@ -411,8 +430,7 @@ def main():
         df = pd.DataFrame(pkl.load(f))
     print("Data.shape = {}".format(df.shape))
 
-    #starts = [0, 5, 10]
-    starts = [10]
+    starts = [0, 5, 10]
     ends = [x + 10 for x in starts]
     X = [df[s:e] for (s, e) in zip(starts, ends)]
 
@@ -421,7 +439,8 @@ def main():
                       n_hidden=10,
                       max_iter=500,
                       verbose=True,
-                      anneal=True)
+                      anneal=True,
+                      l2=10.0)
     corex.fit(X)
 
     print(corex.tc)
