@@ -53,7 +53,7 @@ class TimeCorex(object):
 
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0,
-                 verbose=False, seed=None, l1=0.0, l2=0.0):
+                 verbose=False, seed=None):
 
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
@@ -77,73 +77,8 @@ class TimeCorex(object):
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
-        self.l1 = l1
-        self.l2 = l2
-
         self.history = [{} for t in range(self.nt)]  # Keep track of values for each iteration
         self.rng = RandomStreams(seed)
-
-    def _define_model(self, anneal_eps):
-
-        self.x_wno = [None] * self.nt
-        self.x = [None] * self.nt
-        self.ws = [None] * self.nt
-        self.z_mean = [None] * self.nt
-        self.z = [None] * self.nt
-
-        for t in range(self.nt):
-            self.x_wno[t] = T.matrix('X')
-            ns = self.x_wno[t].shape[0]
-            anneal_noise = self.rng.normal(size=(ns, self.nv))
-            self.x[t] = np.sqrt(1 - anneal_eps ** 2) * self.x_wno[t] + anneal_eps * anneal_noise
-            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
-            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
-            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
-            self.z[t] = self.z_mean[t] + z_noise
-
-        EPS = 1e-5
-        self.objs = [None] * self.nt
-
-        for t in range(self.nt):
-            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
-            ns = self.x_wno[t].shape[0]
-            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
-            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
-            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
-
-            # v_xi | z conditional mean
-            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
-
-            # objective
-            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
-            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
-            self.objs[t] = obj_part_1 + obj_part_2
-
-        self.main_obj = T.sum(self.objs)
-
-        # regularization
-        self.reg_obj = T.constant(0)
-
-        if self.l1 > 0:
-            l1_reg = T.sum([T.abs(self.ws[t+1] - self.ws[t]).sum() for t in range(self.nt - 1)])
-            self.reg_obj = self.reg_obj + self.l1 * l1_reg
-
-        if self.l2 > 0:
-            l2_reg = T.sum([T.square(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
-            self.reg_obj = self.reg_obj + self.l2 * l2_reg
-
-        self.total_obj = self.main_obj + self.reg_obj
-
-        # optimizer
-        updates = lasagne.updates.adam(self.total_obj, self.ws)
-
-        # functions
-        self.train_step = theano.function(inputs=self.x_wno,
-                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
-                                          updates=updates)
 
     def fit(self, x):
         x = [np.array(xt, dtype=np.float32) for xt in x]
@@ -154,51 +89,29 @@ class TimeCorex(object):
         if self.anneal:
             anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
 
+        self._define_model()
+
         for i_eps, eps in enumerate(anneal_schedule):
             start_time = time.time()
 
             self.eps = eps
-            if i_eps > 0:
-                old_ws = [w.get_value() for w in self.ws]
-                self._define_model(eps)
-                for t in range(self.nt):
-                    self.ws[t].set_value(old_ws[t])
-            else:
-                self._define_model(eps)
-
+            self.anneal_eps.set_value(np.float32(eps))
             self.moments = self._calculate_moments(x, self.ws, quick=True)
             self._update_u(x)
 
             for i_loop in range(self.max_iter):
-                last_tc = np.sum(self.tc)  # Save this TC to compare to possible updates
-
                 ret = self.train_step(*x)
                 obj = ret[0]
                 reg_obj = ret[2]
-                self.moments = self._calculate_moments(x, self.ws, quick=True)
-                self._update_u(x)
 
-                if i_loop % 10 == 0:
+                if i_loop % 10 == 0 and self.verbose:
+                    self.moments = self._calculate_moments(x, self.ws, quick=True)
+                    self._update_u(x)
                     print("tc = {}, obj = {}, reg = {}, eps = {}".format(np.sum(self.tc),
                                                                          obj, reg_obj, eps))
 
-                if not self.moments or not np.isfinite(np.sum(self.tc)):
-                    print("Error: TC is no longer finite: {}".format(self.tc))
+            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
 
-                delta = np.abs(np.sum(self.tc) - last_tc)
-                self.update_records(self.moments, delta)  # Book-keeping
-                if delta < self.tol:  # Check for convergence
-                    if self.verbose:
-                        print('{:d} iterations to tol: {:f}, Time: {}, TC: {}'.format(i_loop, self.tol,
-                                                                                      time.time() - start_time,
-                                                                                      np.sum(self.tc)))
-                    break
-            else:
-                if self.verbose:
-                    print("Warning: Convergence not achieved in {:d} iterations. "
-                          "Final delta: {:f}, Time: {}, TC: {}".format(self.max_iter, delta,
-                                                                       time.time() - start_time,
-                                                                       np.sum(self.tc)))
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
         return self
 
@@ -422,29 +335,226 @@ class TimeCorex(object):
         return ret
 
 
-def main():
-    import pandas as pd
-    import cPickle as pkl
+class TimeCorexW(TimeCorex):
 
-    with open('../data/EOD_week.pkl', 'rb') as f:
-        df = pd.DataFrame(pkl.load(f))
-    print("Data.shape = {}".format(df.shape))
+    def __init__(self, l1=0.0, l2=0.0, **kwargs):
+        super(TimeCorexW, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
 
-    starts = [0, 5, 10]
-    ends = [x + 10 for x in starts]
-    X = [df[s:e] for (s, e) in zip(starts, ends)]
+    def _define_model(self):
 
-    corex = TimeCorex(nt=len(starts),
-                      nv=df.shape[1],
-                      n_hidden=10,
-                      max_iter=500,
-                      verbose=True,
-                      anneal=True,
-                      l2=10.0)
-    corex.fit(X)
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
 
-    print(corex.tc)
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
+
+        EPS = 1e-5
+        self.objs = [None] * self.nt
+
+        for t in range(self.nt):
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(self.ws[t+1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)
 
 
-if __name__ == '__main__':
-    main()
+class TimeCorexGlobalMI(TimeCorex):
+
+    def __init__(self, l1=0.0, l2=0.0, **kwargs):
+        super(TimeCorexGlobalMI, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
+
+    def _define_model(self):
+
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
+
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
+
+        EPS = 1e-5
+        self.objs = [None] * self.nt
+        self.mizx = [None] * self.nt
+
+        for t in range(self.nt):
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+
+            self.mizx[t] = -0.5 * T.log1p(-T.clip(R ** 2, 0, 1 - EPS))
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(self.mizx[t+1] - self.mizx[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.mizx[t + 1] - self.mizx[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)
+
+class TimeCorexSigma(TimeCorex):
+
+    def __init__(self, l1=0.0, l2=0.0, **kwargs):
+        super(TimeCorexSigma, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
+
+    def _define_model(self):
+
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
+
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
+
+        EPS = 1e-5
+        self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
+
+        for t in range(self.nt):
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            inner_mat = R / T.clip(1 - R ** 2, EPS, 1)
+            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+            self.sigma[t] = self.sigma[t] / (1 + ri).reshape((self.nv, 1))
+            self.sigma[t] = self.sigma[t] / (1 + ri).reshape((1, self.nv))
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv))
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(self.sigma[t+1] - self.sigma[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.sigma[t + 1] - self.sigma[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)

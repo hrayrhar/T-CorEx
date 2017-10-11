@@ -139,28 +139,13 @@ class Corex:
             self._update_u(x)
 
             for i_loop in range(self.max_iter):
-                last_tc = self.tc  # Save this TC to compare to possible updates
-
                 (obj, _) = self.train_step(x.astype(np.float32))
-                self.moments = self._calculate_moments(x, self.ws, quick=True)
-                self._update_u(x)
 
-                if i_loop % 10 == 0:
+                if i_loop % 15 == 0:
+                    self.moments = self._calculate_moments(x, self.ws, quick=True)
+                    self._update_u(x)
                     print "tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps)
 
-                if not self.moments or not np.isfinite(self.tc):
-                    print("Error: TC is no longer finite: {}".format(self.tc))
-
-                delta = np.abs(self.tc - last_tc)
-                self.update_records(self.moments, delta)  # Book-keeping
-                if delta < self.tol:  # Check for convergence
-                    if self.verbose:
-                        print('{:d} iterations to tol: {:f}, tc: {}'.format(i_loop, self.tol, self.tc))
-                    break
-            else:
-                if self.verbose:
-                    print("Warning: Convergence not achieved in {:d} iterations. "
-                          "Final delta: {:f}, tc: {}".format(self.max_iter, delta, self.tc))
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
 
@@ -174,17 +159,6 @@ class Corex:
 
     def _update_u(self, x):
         self.us = self.getus(self.ws.get_value(), x)
-
-    def update_records(self, moments, delta):
-        """Print and store some statistics about each iteration."""
-        gc.disable()  # There's a bug that slows when appending, fixed by temporarily disabling garbage collection
-        self.history["TC"] = self.history.get("TC", []) + [moments["TC"]]
-        if self.verbose > 1:
-            print("TC={:.3f}\tadd={:.3f}\tdelta={:.6f}".format(moments["TC"], moments.get("additivity", 0), delta))
-        if self.verbose:
-            self.history["additivity"] = self.history.get("additivity", []) + [moments.get("additivity", 0)]
-            self.history["TCs"] = self.history.get("TCs", []) + [moments.get("TCs", np.zeros(self.m))]
-        gc.enable()
 
     @property
     def tc(self):
