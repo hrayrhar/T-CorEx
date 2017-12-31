@@ -364,6 +364,7 @@ class TimeCorexW(TimeCorex):
 
         EPS = 1e-5
         self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
 
         for t in range(self.nt):
             z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
@@ -377,6 +378,10 @@ class TimeCorexW(TimeCorex):
             inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
             inner_term_2 = self.z[t].reshape((ns, self.m, 1))
             cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, EPS, 1)
+            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
 
             # objective
             obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
@@ -405,6 +410,9 @@ class TimeCorexW(TimeCorex):
         self.train_step = theano.function(inputs=self.x_wno,
                                           outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
+
+        self.get_norm_covariance = theano.function(inputs=self.x_wno,
+                                                   outputs=self.sigma)
 
 
 class TimeCorexGlobalMI(TimeCorex):
@@ -511,6 +519,7 @@ class TimeCorexSigma(TimeCorex):
         EPS = 1e-5
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
+        self.R = [None] * self.nt
 
         for t in range(self.nt):
             z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
@@ -525,11 +534,11 @@ class TimeCorexSigma(TimeCorex):
             inner_term_2 = self.z[t].reshape((ns, self.m, 1))
             cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
-            inner_mat = R / T.clip(1 - R ** 2, EPS, 1)
+            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, EPS, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)
-            self.sigma[t] = self.sigma[t] / (1 + ri).reshape((self.nv, 1))
-            self.sigma[t] = self.sigma[t] / (1 + ri).reshape((1, self.nv))
-            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv))
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+
+            self.R[t] = R
 
             # objective
             obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
@@ -558,3 +567,9 @@ class TimeCorexSigma(TimeCorex):
         self.train_step = theano.function(inputs=self.x_wno,
                                           outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
+
+        self.get_norm_covariance = theano.function(inputs=self.x_wno,
+                                                   outputs=self.sigma)
+
+        self.get_R = theano.function(inputs=self.x_wno,
+                                     outputs=self.R)
