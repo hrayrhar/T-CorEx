@@ -69,32 +69,34 @@ def main():
                                   'mode': 'lars',
                                   'max_iter': 100}),
 
-        (baselines.LinearCorex(), {'n_hidden': [3, 4, 5, 6, args.m//2, args.m, 2*args.m, 20],
+        (baselines.LinearCorex(), {'n_hidden': [args.m],
                                    'max_iter': 500,
                                    'anneal': True}),
 
         (baselines.TimeVaryingCorex(), {'nt': args.nt,
                                         'nv': args.nv,
-                                        'n_hidden': args.m,  # TODO: add to the grid
+                                        'n_hidden': [args.m],
                                         'max_iter': 500,
                                         'anneal': True,
-                                        'l1': 0.3,  # TODO: add to the grid
-                                        'l2': 0.0}),  # TODO: add to the grid
+                                        'l1': [0, 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3],
+                                        'l2': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3]}),
 
-        (baselines.TimeVaryingGraphLasso(), {'lamb': 0.001,  # TODO: add to grid
-                                             'beta': 0.1,  # TODO: add to grid
-                                             'indexOfPenalty': 1})  # TODO add to grid or find the best value
+        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.00001, 0.00003, 0.001, 0.003, 0.001, 0.003, 0.01, 0.03, 0.1],
+                                             'beta': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1],
+                                             'indexOfPenalty': [1, 2]})
     ]
 
     results = {}
-    for (method, params) in methods[:8]:
+    for (method, params) in methods:
         best_params = method.select(train_data, val_data, params)
         results[method.get_name()] = method.evaluate(train_data, test_data, best_params, args.eval_iter)
         results[method.get_name()]['best_params'] = best_params
 
     print "Saving the data and parameters of the experiment ..."
-    exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
-        prefix, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
+    exp_name = 'nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
+        args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
+    if prefix != '':
+        exp_name = prefix + '.' + exp_name
 
     results_path = "results/{}.results.json".format(exp_name)
     print "Saving the results in {}".format(results_path)
@@ -102,14 +104,14 @@ def main():
     with open(results_path, 'w') as f:
         json.dump(results, f)
 
-    data_path = "saved_data/{}.pkl".format(data_path)
+    data_path = "saved_data/{}.pkl".format(exp_name)
     print "Saving data and params in {}".format(data_path)
     data = dict()
     data['prefix'] = args.prefix
     data['nt'] = args.nt
     data['m'] = args.m
     data['bs'] = args.bs
-    data['train_cnt'] = args.train_ctn
+    data['train_cnt'] = args.train_cnt
     data['val_cnt'] = args.val_cnt
     data['test_cnt'] = args.test_cnt
     data['snr'] = args.snr

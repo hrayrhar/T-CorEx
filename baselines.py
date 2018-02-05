@@ -278,10 +278,33 @@ class TimeVaryingCorex(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Selecting the best parameter values for Time Varying Linear Corex ..."
-        pass
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params)
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
+                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                                   'max_iter': params['max_iter'], 'anneal': True})
+                cur_params['l1'] = 0
+                cur_params['l2'] = 0
+                cur_params[reg_param[0]] = reg_param[1]
+                if best_params is None:
+                    best_params = cur_params  # just to select one valid set of parameters
+                cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                if not np.isnan(cur_score) and cur_score < best_score:
+                    best_score = cur_score
+                    best_params = cur_params
+                done += 1
+        print "\n"
+        return best_params
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
-        print "Evaluating time-varying corex for {} iterations ...".format(n_iter)
+        if verbose:
+            print "Evaluating time-varying corex for {} iterations ...".format(n_iter)
         scores = []
         for iteration in range(n_iter):
             c = theano_time_corex.TimeCorexSigma(nt=params['nt'],
@@ -307,22 +330,40 @@ class TimeVaryingGraphLasso(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Selecting the best parameter values for TVGL ..."
-        pass
+        best_score = 1e18
+        best_params = None
+        grid_size = len(params['lamb']) * len(params['beta']) * len(params['indexOfPenalty'])
+        done = 0
+        for lamb in params['lamb']:
+            for beta in params['beta']:
+                for indexOfPenalty in params['indexOfPenalty']:
+                    cur_params = dict({'lamb': lamb, 'beta': beta, 'indexOfPenalty': indexOfPenalty})
+                    print "\rdone {} / {} {}".format(done, grid_size, ' ' * 10)
+                    if best_params is None:
+                        best_params = cur_params  # just to select one valid set of parameters
+                    cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                    if not np.isnan(cur_score) and cur_score < best_score:
+                        best_score = cur_score
+                        best_params = cur_params
+                    done += 1
+        print "\n"
+        return best_params
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
-        print "Evaluating time-varying graphical LASSO for {} iterations ...".format(n_iter)
+        if verbose:
+            print "Evaluating time-varying graphical LASSO for {} iterations ...".format(n_iter)
         # construct time-series
         train_data_ts = []
         for x in train_data:
-            train_data_ts += x
+            train_data_ts += list(x)
         train_data_ts = np.array(train_data_ts)
         scores = []
         for iteration in range(n_iter):
-            inv_covs = TVGL(data=train_data_ts,
-                            lengthOfSlice=params['lengthOfSlice'],
-                            lamb=params['lamb'],
-                            beta=params['beta'],
-                            indexOfPenalty=params['indexOfPenalty'])
+            inv_covs = TVGL.TVGL(data=train_data_ts,
+                                 lengthOfSlice=len(train_data[0]),
+                                 lamb=params['lamb'],
+                                 beta=params['beta'],
+                                 indexOfPenalty=params['indexOfPenalty'])
             covs = [np.linalg.inv(x) for x in inv_covs]
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
