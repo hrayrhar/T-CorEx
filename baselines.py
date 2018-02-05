@@ -3,21 +3,25 @@ import sklearn.covariance as sk_cov
 import metric_utils
 import linearcorex
 import theano_time_corex
+import numpy as np
 
 import sys
 sys.path.append('../TVGL')
 import TVGL
 
 
-class Baseline(Object):
+class Baseline(object):
     def __init__(self):
-        super(Baseline, self).__init__()
+        pass
 
     def select(self, train_data, val_data, params):
         raise NotImplementedError()
 
     def evaluate(self, train_data, test_data, params, n_iter):
         raise NotImplementedError()
+
+    def get_name(self):
+        return "unknown"
 
     def report_scores(self, scores, n_iter):
         if not isinstance(scores, list):
@@ -28,11 +32,30 @@ class Baseline(Object):
                 "scores": scores}
 
 
+class GroundTruth(Baseline):
+    def __init__(self, covs):
+        super(GroundTruth, self).__init__()
+        self.covs = covs
+
+    def select(self, train_data, val_data, params):
+        print "Empty model selection for ground truth baseline"
+        return {}
+
+    def evaluate(self, train_data, test_data, params, n_iter):
+        print "Evaluating ground truth baseline ..."
+        nll = metric_utils.calculate_nll_score(data=test_data, covs=self.covs)
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return "GroundTruth"
+
+
 class LinearCorex(Baseline):
     def __init__(self):
         super(LinearCorex, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Linear Corex ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -50,12 +73,16 @@ class LinearCorex(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
+    def get_name(self):
+        return "LinearCorex"
+
 
 class TimeVaryingCorex(Baseline):
     def __init__(self):
         super(TimeVaryingCorex, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Time Varying Linear Corex ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -75,13 +102,17 @@ class TimeVaryingCorex(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
+    def get_name(self):
+        return 'TimeVaryingCorex'
+
 
 class Diagonal(Baseline):
     def __init__(self):
         super(Diagonal, self).__init__()
 
     def select(self, train_data, val_data, params):
-        return params
+        print "Empty model selection of diagonal baseline"
+        return {}
 
     def evaluate(self, train_data, test_data, params, n_iter):
         print "Evaluating diagonal baseline ..."
@@ -89,14 +120,17 @@ class Diagonal(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
+    def get_name(self):
+        return 'Diagonal'
+
 
 class LedoitWolf(Baseline):
-
     def __init__(self):
         super(LedoitWolf, self).__init__()
 
     def select(self, train_data, val_data, params):
-        pass
+        print "Empty model selection of Ledoit-Wolf baseline"
+        return {}
 
     def evaluate(self, train_data, test_data, params, n_iter):
         print "Evaluating Ledoit-Wolf baselines ..."
@@ -108,14 +142,17 @@ class LedoitWolf(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
+    def get_name(self):
+        return 'LedoitWolf'
+
 
 class OAS(Baseline):
-
     def __init__(self):
         super(OAS, self).__init__()
 
     def select(self, train_data, val_data, params):
-        pass
+        print "Empty model selection of oracle approximating shrinkage baseline"
+        return {}
 
     def evaluate(self, train_data, test_data, params, n_iter):
         print "Evaluating oracle approximating shrinkage baselines ..."
@@ -127,13 +164,16 @@ class OAS(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
+    def get_name(self):
+        return 'OAS'
+
 
 class PCA(Baseline):
-
     def __init__(self):
         super(PCA, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for PCA ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -146,13 +186,16 @@ class PCA(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
+    def get_name(self):
+        return 'PCA'
+
 
 class FactorAnalysis(Baseline):
-
     def __init__(self):
         super(FactorAnalysis, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Factor Analysis ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -165,13 +208,16 @@ class FactorAnalysis(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
+    def get_name(self):
+        return 'FactorAnalysis'
+
 
 class GraphLasso(Baseline):
-
     def __init__(self):
         super(GraphLasso, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Graphical Lasso ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -188,13 +234,16 @@ class GraphLasso(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
+    def get_name(self):
+        return 'GraphLasso'
+
 
 class TimeVaryingGraphLasso(Baseline):
-
     def __init__(self):
         super(TimeVaryingGraphLasso, self).__init__()
 
     def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for TVGL ..."
         pass
 
     def evaluate(self, train_data, test_data, params, n_iter):
@@ -215,3 +264,6 @@ class TimeVaryingGraphLasso(Baseline):
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
+
+    def get_name(self):
+        return 'TimeVaryingGraphLasso'
