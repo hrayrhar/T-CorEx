@@ -17,7 +17,7 @@ class Baseline(object):
     def select(self, train_data, val_data, params):
         raise NotImplementedError()
 
-    def evaluate(self, train_data, test_data, params, n_iter):
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         raise NotImplementedError()
 
     def get_name(self):
@@ -41,13 +41,197 @@ class GroundTruth(Baseline):
         print "Empty model selection for ground truth baseline"
         return {}
 
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating ground truth baseline ..."
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating ground truth baseline ..."
         nll = metric_utils.calculate_nll_score(data=test_data, covs=self.covs)
         return self.report_scores(nll, n_iter)
 
     def get_name(self):
         return "GroundTruth"
+
+
+class Diagonal(Baseline):
+    def __init__(self):
+        super(Diagonal, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Empty model selection of diagonal baseline"
+        return {}
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating diagonal baseline ..."
+        covs = [np.diag(np.var(x, axis=0)) for x in train_data]
+        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return 'Diagonal'
+
+
+class LedoitWolf(Baseline):
+    def __init__(self):
+        super(LedoitWolf, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Empty model selection of Ledoit-Wolf baseline"
+        return {}
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating Ledoit-Wolf baselines ..."
+        covs = []
+        for x in train_data:
+            est = sk_cov.LedoitWolf()
+            est.fit(x)
+            covs.append(est.covariance_)
+        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return 'LedoitWolf'
+
+
+class OAS(Baseline):
+    def __init__(self):
+        super(OAS, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Empty model selection of oracle approximating shrinkage baseline"
+        return {}
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=False):
+        if verbose:
+            print "Evaluating oracle approximating shrinkage baselines ..."
+        covs = []
+        for x in train_data:
+            est = sk_cov.OAS()
+            est.fit(x)
+            covs.append(est.covariance_)
+        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return 'OAS'
+
+
+class PCA(Baseline):
+    def __init__(self):
+        super(PCA, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for PCA ..."
+        best_score = 1e18
+        best_params = None
+        for n_components in params['n_components']:
+            cur_params = {'n_components': n_components}
+            if best_params is None:
+                best_params = cur_params  # just to select one valid set of parameters
+            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+            if not np.isnan(cur_score) and cur_score < best_score:
+                best_score = cur_score
+                best_params = cur_params
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating PCA ..."
+        try:
+            covs = []
+            for x in train_data:
+                est = sk_dec.PCA(n_components=params['n_components'])
+                est.fit(x)
+                covs.append(est.get_covariance())
+            nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        except Exception as e:
+            if verbose:
+                print "PCA failed with message: {}".format(e.message)
+            nll = np.nan
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return 'PCA'
+
+
+class FactorAnalysis(Baseline):
+    def __init__(self):
+        super(FactorAnalysis, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Factor Analysis ..."
+        best_score = 1e18
+        best_params = None
+        for n_components in params['n_components']:
+            cur_params = {'n_components': n_components}
+            if best_params is None:
+                best_params = cur_params  # just to select one valid set of parameters
+            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+            if not np.isnan(cur_score) and cur_score < best_score:
+                best_score = cur_score
+                best_params = cur_params
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating Factor Analysis ..."
+        try:
+            covs = []
+            for x in train_data:
+                est = sk_dec.FactorAnalysis(n_components=params['n_components'])
+                est.fit(x)
+                covs.append(est.get_covariance())
+            nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        except Exception as e:
+            if verbose:
+                print "Factor analysis failed with message: {}".format(e.message)
+            nll = np.nan
+        return self.report_scores(nll, n_iter)
+
+    def get_name(self):
+        return 'FactorAnalysis'
+
+
+class GraphLasso(Baseline):
+    def __init__(self):
+        super(GraphLasso, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Graphical Lasso ..."
+        best_score = 1e18
+        best_params = None
+        for alpha in params['alpha']:
+            cur_params = {'alpha': alpha, 'max_iter': params['max_iter'], 'mode': params['mode']}
+            if best_params is None:
+                best_params = cur_params  # just to select one valid set of parameters
+            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+            if not np.isnan(cur_score) and cur_score < best_score:
+                best_score = cur_score
+                best_params = cur_params
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating grahical LASSO for {} iterations ...".format(n_iter)
+        try:
+            scores = []
+            for iteration in range(n_iter):
+                covs = []
+                for x in train_data:
+                    est = sk_cov.GraphLasso(alpha=params['alpha'],
+                                            max_iter=params['max_iter'])
+                    est.fit(x)
+                    covs.append(est.covariance_)
+                cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+                scores.append(cur_nll)
+        except Exception as e:
+            if verbose:
+                print "Graphical Lasso failed with message: {}".format(e.message)
+            scores = np.nan
+        return self.report_scores(scores, n_iter)
+
+    def get_name(self):
+        return 'GraphLasso'
 
 
 class LinearCorex(Baseline):
@@ -56,10 +240,21 @@ class LinearCorex(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Selecting the best parameter values for Linear Corex ..."
-        pass
+        best_score = 1e18
+        best_params = None
+        for n_hidden in params['n_hidden']:
+            cur_params = {'n_hidden': n_hidden, 'max_iter': params['max_iter'], 'anneal': True}
+            if best_params is None:
+                best_params = cur_params  # just to select one valid set of parameters
+            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+            if not np.isnan(cur_score) and cur_score < best_score:
+                best_score = cur_score
+                best_params = cur_params
+        return best_params
 
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating linear corex for {} iterations ...".format(n_iter)
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating linear corex for {} iterations ...".format(n_iter)
         scores = []
         for iteration in range(n_iter):
             covs = []
@@ -85,7 +280,7 @@ class TimeVaryingCorex(Baseline):
         print "Selecting the best parameter values for Time Varying Linear Corex ..."
         pass
 
-    def evaluate(self, train_data, test_data, params, n_iter):
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         print "Evaluating time-varying corex for {} iterations ...".format(n_iter)
         scores = []
         for iteration in range(n_iter):
@@ -106,138 +301,6 @@ class TimeVaryingCorex(Baseline):
         return 'TimeVaryingCorex'
 
 
-class Diagonal(Baseline):
-    def __init__(self):
-        super(Diagonal, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Empty model selection of diagonal baseline"
-        return {}
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating diagonal baseline ..."
-        covs = [np.diag(np.var(x, axis=0)) for x in train_data]
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-        return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'Diagonal'
-
-
-class LedoitWolf(Baseline):
-    def __init__(self):
-        super(LedoitWolf, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Empty model selection of Ledoit-Wolf baseline"
-        return {}
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating Ledoit-Wolf baselines ..."
-        covs = []
-        for x in train_data:
-            est = sk_cov.LedoitWolf()
-            est.fit(x)
-            covs.append(est.covariance_)
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-        return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'LedoitWolf'
-
-
-class OAS(Baseline):
-    def __init__(self):
-        super(OAS, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Empty model selection of oracle approximating shrinkage baseline"
-        return {}
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating oracle approximating shrinkage baselines ..."
-        covs = []
-        for x in train_data:
-            est = sk_cov.OAS()
-            est.fit(x)
-            covs.append(est.covariance_)
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-        return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'OAS'
-
-
-class PCA(Baseline):
-    def __init__(self):
-        super(PCA, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Selecting the best parameter values for PCA ..."
-        pass
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating PCA ..."
-        covs = []
-        for x in train_data:
-            est = sk_dec.PCA(n_components=params['n_components'])
-            est.fit(x)
-            covs.append(est.get_covariance())
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-        return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'PCA'
-
-
-class FactorAnalysis(Baseline):
-    def __init__(self):
-        super(FactorAnalysis, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Selecting the best parameter values for Factor Analysis ..."
-        pass
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating Factor Analysis ..."
-        covs = []
-        for x in train_data:
-            est = sk_dec.FactorAnalysis(n_components=params['n_components'])
-            est.fit(x)
-            covs.append(est.get_covariance())
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-        return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'FactorAnalysis'
-
-
-class GraphLasso(Baseline):
-    def __init__(self):
-        super(GraphLasso, self).__init__()
-
-    def select(self, train_data, val_data, params):
-        print "Selecting the best parameter values for Graphical Lasso ..."
-        pass
-
-    def evaluate(self, train_data, test_data, params, n_iter):
-        print "Evaluating grahical LASSO for {} iterations ...".format(n_iter)
-        scores = []
-        for iteration in range(n_iter):
-            covs = []
-            for x in train_data:
-                est = sk_cov.GraphLasso(alpha=params['alpha'],
-                                        max_iter=params['max_iter'])
-                est.fit(x)
-                covs.append(est.covariance_)
-            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-            scores.append(cur_nll)
-        return self.report_scores(scores, n_iter)
-
-    def get_name(self):
-        return 'GraphLasso'
-
-
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self):
         super(TimeVaryingGraphLasso, self).__init__()
@@ -246,7 +309,7 @@ class TimeVaryingGraphLasso(Baseline):
         print "Selecting the best parameter values for TVGL ..."
         pass
 
-    def evaluate(self, train_data, test_data, params, n_iter):
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         print "Evaluating time-varying graphical LASSO for {} iterations ...".format(n_iter)
         # construct time-series
         train_data_ts = []
