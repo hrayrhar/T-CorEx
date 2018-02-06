@@ -1,4 +1,4 @@
-from generate_data import generate_nglf_from_matrix, generate_nglf_from_model
+from generate_data import generate_nglf_from_matrix, generate_nglf_from_model, generate_general_make_spd
 from misc_utils import make_sure_path_exists
 
 import cPickle
@@ -26,12 +26,12 @@ def main():
                         help='which dataset to load/create')
     parser.add_argument('--load_experiment', type=str, default=None, help='path to previously stored experiment')
     args = parser.parse_args()
-    exp_data = var(args)
+    exp_data = vars(args)
     exp_data['nv'] = exp_data['m'] * exp_data['bs']
 
-    if args.load_data:
-        print "Loading previously saved data ..."
-        with open(args.load_data, 'r') as f:
+    if args.load_experiment:
+        print "Loading previously saved data from {} ...".format(args.load_experiment)
+        with open(args.load_experiment, 'r') as f:
             loaded_exp_data = cPickle.load(f)
             for k, v in loaded_exp_data.iteritems():
                 exp_data[k] = v
@@ -45,6 +45,9 @@ def main():
                                                        snr=args.snr, min_var=args.min_var, max_var=args.max_var)
             data = data1 + data2
             args.ground_truth_covs = [sigma1 for i in range(args.nt // 2)] + [sigma2 for i in range(args.nt // 2)]
+            args.train_data = [x[:args.train_cnt] for x in data]
+            args.val_data = [x[args.train_cnt:args.train_cnt + args.val_cnt] for x in data]
+            args.test_data = [x[-args.test_cnt:] for x in data]
 
         if args.data_type == 'syn_general_buckets':
             (data1, sigma1) = generate_general_make_spd(args.nv, args.m, args.nt // 2,
@@ -53,14 +56,12 @@ def main():
                                                         ns=args.train_cnt + args.val_cnt + args.test_cnt)
             data = data1 + data2
             args.ground_truth_covs = [sigma1 for i in range(args.nt // 2)] + [sigma2 for i in range(args.nt // 2)]
-
-        train_data = [x[:args.train_cnt] for x in data]
-        val_data = [x[args.train_cnt:args.train_cnt + args.val_cnt] for x in data]
-        test_data = [x[-args.test_cnt:] for x in data]
-
+            args.train_data = [x[:args.train_cnt] for x in data]
+            args.val_data = [x[args.train_cnt:args.train_cnt + args.val_cnt] for x in data]
+            args.test_data = [x[-args.test_cnt:] for x in data]
 
     methods = [
-        (baselines.GroundTruth(covs=ground_truth_covs), {}),
+        (baselines.GroundTruth(covs=args.ground_truth_covs), {}),
 
         (baselines.Diagonal(), {}),
 
@@ -85,26 +86,42 @@ def main():
                                         'n_hidden': [args.m],
                                         'max_iter': 500,
                                         'anneal': True,
-                                        'l1': [0, 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3],
-                                        'l2': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3]}),
+                                        'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                        'l2': []}),
 
-        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.00001, 0.00003, 0.001, 0.003, 0.001, 0.003, 0.01, 0.03, 0.1],
-                                             'beta': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1],
-                                             'indexOfPenalty': [1, 2],
-                                             'max_iter': 30})
+        (baselines.TimeVaryingCorexW(), {'nt': args.nt,
+                                         'nv': args.nv,
+                                         'n_hidden': [args.m],
+                                         'max_iter': 500,
+                                         'anneal': True,
+                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                         'l2': []}),
+
+        (baselines.TimeVaryingCorexMI(), {'nt': args.nt,
+                                          'nv': args.nv,
+                                          'n_hidden': [args.m],
+                                          'max_iter': 500,
+                                          'anneal': True,
+                                          'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                          'l2': []}),
+
+        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
+                                             'beta': [0.01, 0.03, 0.1, 0.3],
+                                             'indexOfPenalty': [1],  # TODO: extend grid of this one
+                                             'max_iter': 30})  # TODO: make this more
     ]
 
     results = {}
     for (method, params) in methods:
-        best_params = method.select(train_data, val_data, params)
-        results[method.get_name()] = method.evaluate(train_data, test_data, best_params, args.eval_iter)
+        best_params = method.select(args.train_data, args.val_data, params)
+        results[method.get_name()] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
         results[method.get_name()]['best_params'] = best_params
 
     print "Saving the data and parameters of the experiment ..."
-    exp_name = 'nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
-        args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
-    if prefix != '':
-        exp_name = prefix + '.' + exp_name
+    exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
+        args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
+    if args.prefix != '':
+        exp_name = args.prefix + '.' + exp_name
 
     results_path = "results/{}.results.json".format(exp_name)
     print "Saving the results in {}".format(results_path)
@@ -118,7 +135,6 @@ def main():
     with open(data_path, 'w') as f:
         cPickle.dump(exp_data, f)
 
-    print exp_data.keys()
 
 if __name__ == '__main__':
     main()

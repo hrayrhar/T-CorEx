@@ -324,6 +324,110 @@ class TimeVaryingCorex(Baseline):
         return 'TimeVaryingCorex'
 
 
+class TimeVaryingCorexW(Baseline):
+    def __init__(self):
+        super(TimeVaryingCorexW, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Time Varying Linear Corex (W) ..."
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params)
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
+                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                                   'max_iter': params['max_iter'], 'anneal': True})
+                cur_params['l1'] = 0
+                cur_params['l2'] = 0
+                cur_params[reg_param[0]] = reg_param[1]
+                if best_params is None:
+                    best_params = cur_params  # just to select one valid set of parameters
+                cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                if not np.isnan(cur_score) and cur_score < best_score:
+                    best_score = cur_score
+                    best_params = cur_params
+                done += 1
+        print "\n"
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating time-varying corex (W) for {} iterations ...".format(n_iter)
+        scores = []
+        for iteration in range(n_iter):
+            c = theano_time_corex.TimeCorexW(nt=params['nt'],
+                                             nv=params['nv'],
+                                             n_hidden=params['n_hidden'],
+                                             max_iter=params['max_iter'],
+                                             anneal=params['anneal'],
+                                             l1=params['l1'],
+                                             l2=params['l2'])
+            c.fit(train_data)
+            covs = c.get_covariance()
+            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+            scores.append(cur_nll)
+        return self.report_scores(scores, n_iter)
+
+    def get_name(self):
+        return 'TimeVaryingCorexW'
+
+
+class TimeVaryingCorexMI(Baseline):
+    def __init__(self):
+        super(TimeVaryingCorexMI, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Time Varying Linear Corex (MI) ..."
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params)
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
+                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                                   'max_iter': params['max_iter'], 'anneal': True})
+                cur_params['l1'] = 0
+                cur_params['l2'] = 0
+                cur_params[reg_param[0]] = reg_param[1]
+                if best_params is None:
+                    best_params = cur_params  # just to select one valid set of parameters
+                cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                if not np.isnan(cur_score) and cur_score < best_score:
+                    best_score = cur_score
+                    best_params = cur_params
+                done += 1
+        print "\n"
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating time-varying corex (MI) for {} iterations ...".format(n_iter)
+        scores = []
+        for iteration in range(n_iter):
+            c = theano_time_corex.TimeCorexGlobalMI(nt=params['nt'],
+                                                    nv=params['nv'],
+                                                    n_hidden=params['n_hidden'],
+                                                    max_iter=params['max_iter'],
+                                                    anneal=params['anneal'],
+                                                    l1=params['l1'],
+                                                    l2=params['l2'])
+            c.fit(train_data)
+            covs = c.get_covariance()
+            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+            scores.append(cur_nll)
+        return self.report_scores(scores, n_iter)
+
+    def get_name(self):
+        return 'TimeVaryingCorexMI'
+
+
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self):
         super(TimeVaryingGraphLasso, self).__init__()
