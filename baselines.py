@@ -337,7 +337,8 @@ class TimeVaryingGraphLasso(Baseline):
         for lamb in params['lamb']:
             for beta in params['beta']:
                 for indexOfPenalty in params['indexOfPenalty']:
-                    cur_params = dict({'lamb': lamb, 'beta': beta, 'indexOfPenalty': indexOfPenalty})
+                    cur_params = dict({'lamb': lamb, 'beta': beta, 'indexOfPenalty': indexOfPenalty,
+                                       'max_iter': params['max_iter']})
                     print "\rdone {} / {} {}".format(done, grid_size, ' ' * 10)
                     if best_params is None:
                         best_params = cur_params  # just to select one valid set of parameters
@@ -363,7 +364,8 @@ class TimeVaryingGraphLasso(Baseline):
                                  lengthOfSlice=len(train_data[0]),
                                  lamb=params['lamb'],
                                  beta=params['beta'],
-                                 indexOfPenalty=params['indexOfPenalty'])
+                                 indexOfPenalty=params['indexOfPenalty'],
+                                 max_iter=params['max_iter'])
             covs = [np.linalg.inv(x) for x in inv_covs]
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)

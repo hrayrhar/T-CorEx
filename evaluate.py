@@ -18,39 +18,46 @@ def main():
     parser.add_argument('--snr', type=float, default=None, help='signal to noise ratio')
     parser.add_argument('--min_var', type=float, default=1.0, help='minimum x-variance')
     parser.add_argument('--max_var', type=float, default=1.0, help='maximum x-variance')
-    parser.add_argument('--load_data', type=str, default=None, help='path to previously stored data set')
     parser.add_argument('--eval_iter', type=int, default=5, help='number of evaluation iterations')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
+    parser.add_argument('--data_type', dest='data_type', action='store', default='syn_nglf_buckets',
+                        choices=['syn_nglf_buckets', 'syn_general_buckets', 'syn_nglf_ts',
+                                 'syn_general_ts', 'stock_day', 'stock_week'],
+                        help='which dataset to load/create')
+    parser.add_argument('--load_experiment', type=str, default=None, help='path to previously stored experiment')
     args = parser.parse_args()
-    args.nv = args.m * args.bs
+    exp_data = var(args)
+    exp_data['nv'] = exp_data['m'] * exp_data['bs']
 
     if args.load_data:
         print "Loading previously saved data ..."
         with open(args.load_data, 'r') as f:
-            data = cPickle.load(f)
-        args.nt = data['nt']
-        args.m = data['m']
-        args.bs = data['bs']
-        args.nv = data['nv']
-        args.snr = data['snr']
-        train_data = data['train_data']
-        val_data = data['val_data']
-        test_data = data['test_data']
-        ground_truth_covs = data['ground_truth_covs']
-
+            loaded_exp_data = cPickle.load(f)
+            for k, v in loaded_exp_data.iteritems():
+                exp_data[k] = v
     else:
-        (data1, sigma1) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
-                                                   ns=args.train_cnt + args.val_cnt + args.test_cnt,
-                                                   snr=args.snr, min_var=args.min_var, max_var=args.max_var)
-        (data2, sigma2) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
-                                                   ns=args.train_cnt + args.val_cnt + args.test_cnt,
-                                                   snr=args.snr, min_var=args.min_var, max_var=args.max_var)
-        data = data1 + data2
-        ground_truth_covs = [sigma1 for i in range(args.nt // 2)] + [sigma2 for i in range(args.nt // 2)]
+        if args.data_type == 'syn_nglf_buckets':
+            (data1, sigma1) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
+                                                       ns=args.train_cnt + args.val_cnt + args.test_cnt,
+                                                       snr=args.snr, min_var=args.min_var, max_var=args.max_var)
+            (data2, sigma2) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
+                                                       ns=args.train_cnt + args.val_cnt + args.test_cnt,
+                                                       snr=args.snr, min_var=args.min_var, max_var=args.max_var)
+            data = data1 + data2
+            args.ground_truth_covs = [sigma1 for i in range(args.nt // 2)] + [sigma2 for i in range(args.nt // 2)]
+
+        if args.data_type == 'syn_general_buckets':
+            (data1, sigma1) = generate_general_make_spd(args.nv, args.m, args.nt // 2,
+                                                        ns=args.train_cnt + args.val_cnt + args.test_cnt)
+            (data2, sigma2) = generate_general_make_spd(args.nv, args.m, args.nt // 2,
+                                                        ns=args.train_cnt + args.val_cnt + args.test_cnt)
+            data = data1 + data2
+            args.ground_truth_covs = [sigma1 for i in range(args.nt // 2)] + [sigma2 for i in range(args.nt // 2)]
 
         train_data = [x[:args.train_cnt] for x in data]
         val_data = [x[args.train_cnt:args.train_cnt + args.val_cnt] for x in data]
         test_data = [x[-args.test_cnt:] for x in data]
+
 
     methods = [
         (baselines.GroundTruth(covs=ground_truth_covs), {}),
@@ -83,7 +90,8 @@ def main():
 
         (baselines.TimeVaryingGraphLasso(), {'lamb': [0.00001, 0.00003, 0.001, 0.003, 0.001, 0.003, 0.01, 0.03, 0.1],
                                              'beta': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1],
-                                             'indexOfPenalty': [1, 2]})
+                                             'indexOfPenalty': [1, 2],
+                                             'max_iter': 30})
     ]
 
     results = {}
@@ -106,27 +114,11 @@ def main():
 
     data_path = "saved_data/{}.pkl".format(exp_name)
     print "Saving data and params in {}".format(data_path)
-    data = dict()
-    data['prefix'] = args.prefix
-    data['nt'] = args.nt
-    data['m'] = args.m
-    data['bs'] = args.bs
-    data['train_cnt'] = args.train_cnt
-    data['val_cnt'] = args.val_cnt
-    data['test_cnt'] = args.test_cnt
-    data['snr'] = args.snr
-    data['min_var'] = args.min_var
-    data['max_var'] = args.max_var
-    data['eval_iter'] = args.eval_iter
-    data['train_data'] = train_data
-    data['val_data'] = val_data
-    data['test_data'] = test_data
-    data['ground_truth_covs'] = ground_truth_covs
-
     make_sure_path_exists(data_path)
     with open(data_path, 'w') as f:
-        cPickle.dump(data, f)
+        cPickle.dump(exp_data, f)
 
+    print exp_data.keys()
 
 if __name__ == '__main__':
     main()
