@@ -50,7 +50,6 @@ def mean_impute(x, v):
 
 
 class TimeCorex(object):
-
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0,
                  verbose=False, seed=None):
@@ -129,7 +128,8 @@ class TimeCorex(object):
             print("TC={:.3f}\tadd={:.3f}\tdelta={:.6f}".format(tc_sum, add_sum, delta))
         if self.verbose:
             for t in range(self.nt):
-                self.history[t]["additivity"] = self.history[t].get("additivity", []) + [moments[t].get("additivity", 0)]
+                self.history[t]["additivity"] = self.history[t].get("additivity", []) + [
+                    moments[t].get("additivity", 0)]
                 self.history[t]["TCs"] = self.history[t].get("TCs", []) + [moments[t].get("TCs", np.zeros(self.m))]
         gc.enable()
 
@@ -147,7 +147,7 @@ class TimeCorex(object):
 
     @property
     def mis(self):
-        return [-0.5 * np.log1p(-m["rho"]**2) for m in self.moments]
+        return [-0.5 * np.log1p(-m["rho"] ** 2) for m in self.moments]
 
     def clusters(self):
         return np.argmax(np.abs(self.us), axis=0)  # TODO: understand this
@@ -169,7 +169,7 @@ class TimeCorex(object):
         else:
             y = x.dot(u.T)
             tmp_dot = x.T.dot(y)
-        prod = (1 - self.eps**2) * tmp_dot.T / n_samples + self.eps**2 * u  # nv by m,  <X_i Y_j> / std Y_j
+        prod = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * u  # nv by m,  <X_i Y_j> / std Y_j
         return prod
 
     def getus(self, w, x):
@@ -208,7 +208,7 @@ class TimeCorex(object):
         else:
             y = x.dot(ws.T)
             tmp_sum = np.einsum('lj,lj->j', y, y)
-        m["uj"] = (1 - self.eps**2) * tmp_sum / n_samples + self.eps**2 * np.sum(ws**2, axis=1)
+        m["uj"] = (1 - self.eps ** 2) * tmp_sum / n_samples + self.eps ** 2 * np.sum(ws ** 2, axis=1)
 
         if self.gpu:
             tmp = cm.empty((self.nv, self.m))
@@ -218,32 +218,34 @@ class TimeCorex(object):
             del y
         else:
             tmp_dot = x.T.dot(y)
-        m["rho"] = (1 - self.eps**2) * tmp_dot.T / n_samples + self.eps**2 * ws  # m by nv
+        m["rho"] = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * ws  # m by nv
         m["ry"] = ws.dot(m["rho"].T)  # normalized covariance of Y
         m["Y_j^2"] = self.y_scale ** 2 / (1. - m["uj"])
         np.fill_diagonal(m["ry"], 1)
-        m["invrho"] = 1. / (1. - m["rho"]**2)
+        m["invrho"] = 1. / (1. - m["rho"] ** 2)
         m["rhoinvrho"] = m["rho"] * m["invrho"]
         m["Qij"] = np.dot(m['ry'], m["rhoinvrho"])
         m["Qi"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
-        #m["Qi-Si^2"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
+        # m["Qi-Si^2"] = np.einsum('ki,ki->i', m["rhoinvrho"], m["Qij"])
         m["Si"] = np.sum(m["rho"] * m["rhoinvrho"], axis=0)
 
         # This is the objective, a lower bound for TC
         m["TC"] = np.sum(np.log(1 + m["Si"])) \
-                     - 0.5 * np.sum(np.log(1 - m["Si"]**2 + m["Qi"])) \
-                     + 0.5 * np.sum(np.log(1 - m["uj"]))
+                  - 0.5 * np.sum(np.log(1 - m["Si"] ** 2 + m["Qi"])) \
+                  + 0.5 * np.sum(np.log(1 - m["uj"]))
 
         if not quick:
-            m["MI"] = - 0.5 * np.log1p(-m["rho"]**2)
+            m["MI"] = - 0.5 * np.log1p(-m["rho"] ** 2)
             m["X_i Y_j"] = m["rho"].T * np.sqrt(m["Y_j^2"])
             m["X_i Z_j"] = np.linalg.solve(m["ry"], m["rho"]).T
             m["X_i^2 | Y"] = (1. - np.einsum('ij,ji->i', m["X_i Z_j"], m["rho"])).clip(1e-6)
             m['I(Y_j ; X)'] = 0.5 * np.log(m["Y_j^2"]) - 0.5 * np.log(self.y_scale ** 2)
             m['I(X_i ; Y)'] = - 0.5 * np.log(m["X_i^2 | Y"])
             m["TCs"] = m["MI"].sum(axis=1) - m['I(Y_j ; X)']
-            m["TC_no_overlap"] = m["MI"].max(axis=0).sum() - m['I(Y_j ; X)'].sum()  # A direct calculation of TC where each variable is in exactly one group.
-            m["TC_direct"] = m['I(X_i ; Y)'].sum() - m['I(Y_j ; X)']  # A direct calculation of TC. Should be upper bound for "TC", "TC_no_overlap"
+            m["TC_no_overlap"] = m["MI"].max(axis=0).sum() - m[
+                'I(Y_j ; X)'].sum()  # A direct calculation of TC where each variable is in exactly one group.
+            m["TC_direct"] = m['I(X_i ; Y)'].sum() - m[
+                'I(Y_j ; X)']  # A direct calculation of TC. Should be upper bound for "TC", "TC_no_overlap"
             m["additivity"] = (m["MI"].sum(axis=0) - m['I(X_i ; Y)']).sum()
         return m
 
@@ -281,7 +283,7 @@ class TimeCorex(object):
                 if fit:
                     mean = np.mean(x, axis=0)
                     # std = np.std(x, axis=0, ddof=0).clip(1e-10)
-                    std = np.sqrt(np.sum((x - mean)**2, axis=0) / n_obs).clip(1e-10)
+                    std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / n_obs).clip(1e-10)
                     self.theta.append((mean, std))
                 x = ((x - self.theta[t][0]) / self.theta[t][1])
                 if np.max(np.abs(x)) > 6 and self.verbose:
@@ -325,7 +327,7 @@ class TimeCorex(object):
             if self.discourage_overlap:
                 z = m[t]['rhoinvrho'] / (1 + m[t]['Si'])
                 cov = np.dot(z.T, z)
-                cov /= (1. - self.eps**2)
+                cov /= (1. - self.eps ** 2)
                 np.fill_diagonal(cov, 1)
                 ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
             else:
@@ -336,7 +338,6 @@ class TimeCorex(object):
 
 
 class TimeCorexW(TimeCorex):
-
     def __init__(self, l1=0.0, l2=0.0, **kwargs):
         super(TimeCorexW, self).__init__(**kwargs)
         self.l1 = l1
@@ -375,7 +376,8 @@ class TimeCorexW(TimeCorex):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
             inner_term_2 = self.z[t].reshape((ns, self.m, 1))
             cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
@@ -394,7 +396,7 @@ class TimeCorexW(TimeCorex):
         self.reg_obj = T.constant(0)
 
         if self.l1 > 0:
-            l1_reg = T.sum([T.abs_(self.ws[t+1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = T.sum([T.abs_(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
@@ -415,8 +417,91 @@ class TimeCorexW(TimeCorex):
                                                    outputs=self.sigma)
 
 
-class TimeCorexGlobalMI(TimeCorex):
+class TimeCorexWWT(TimeCorex):
+    def __init__(self, l1=0.0, l2=0.0, **kwargs):
+        super(TimeCorexWWT, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
 
+    def _define_model(self):
+
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
+
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
+
+        EPS = 1e-5
+        self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
+
+        for t in range(self.nt):
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, EPS, 1)
+            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        self.S = [None] * self.nt
+        for t in range(self.nt):
+            self.S[t] = T.dot(self.ws[t].T, self.ws[t])
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(self.S[t + 1] - self.S[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.S[t + 1] - self.S[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)
+
+        self.get_norm_covariance = theano.function(inputs=self.x_wno,
+                                                   outputs=self.sigma)
+
+
+class TimeCorexGlobalMI(TimeCorex):
     def __init__(self, l1=0.0, l2=0.0, **kwargs):
         super(TimeCorexGlobalMI, self).__init__(**kwargs)
         self.l1 = l1
@@ -457,7 +542,8 @@ class TimeCorexGlobalMI(TimeCorex):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
             inner_term_2 = self.z[t].reshape((ns, self.m, 1))
             cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
@@ -472,7 +558,7 @@ class TimeCorexGlobalMI(TimeCorex):
         self.reg_obj = T.constant(0)
 
         if self.l1 > 0:
-            l1_reg = T.sum([T.abs_(self.mizx[t+1] - self.mizx[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = T.sum([T.abs_(self.mizx[t + 1] - self.mizx[t]).sum() for t in range(self.nt - 1)])
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
@@ -489,8 +575,8 @@ class TimeCorexGlobalMI(TimeCorex):
                                           outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
 
-class TimeCorexSigma(TimeCorex):
 
+class TimeCorexSigma(TimeCorex):
     def __init__(self, l1=0.0, l2=0.0, **kwargs):
         super(TimeCorexSigma, self).__init__(**kwargs)
         self.l1 = l1
@@ -530,7 +616,8 @@ class TimeCorexSigma(TimeCorex):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
             inner_term_2 = self.z[t].reshape((ns, self.m, 1))
             cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
@@ -551,7 +638,7 @@ class TimeCorexSigma(TimeCorex):
         self.reg_obj = T.constant(0)
 
         if self.l1 > 0:
-            l1_reg = T.sum([T.abs_(self.sigma[t+1] - self.sigma[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = T.sum([T.abs_(self.sigma[t + 1] - self.sigma[t]).sum() for t in range(self.nt - 1)])
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:

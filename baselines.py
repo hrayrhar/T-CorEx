@@ -20,9 +20,6 @@ class Baseline(object):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         raise NotImplementedError()
 
-    def get_name(self):
-        return "unknown"
-
     def report_scores(self, scores, n_iter):
         if not isinstance(scores, list):
             scores = [scores] * n_iter
@@ -47,9 +44,6 @@ class GroundTruth(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=self.covs)
         return self.report_scores(nll, n_iter)
 
-    def get_name(self):
-        return "GroundTruth"
-
 
 class Diagonal(Baseline):
     def __init__(self):
@@ -65,9 +59,6 @@ class Diagonal(Baseline):
         covs = [np.diag(np.var(x, axis=0)) for x in train_data]
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'Diagonal'
 
 
 class LedoitWolf(Baseline):
@@ -89,9 +80,6 @@ class LedoitWolf(Baseline):
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
 
-    def get_name(self):
-        return 'LedoitWolf'
-
 
 class OAS(Baseline):
     def __init__(self):
@@ -111,9 +99,6 @@ class OAS(Baseline):
             covs.append(est.covariance_)
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'OAS'
 
 
 class PCA(Baseline):
@@ -150,9 +135,6 @@ class PCA(Baseline):
             nll = np.nan
         return self.report_scores(nll, n_iter)
 
-    def get_name(self):
-        return 'PCA'
-
 
 class FactorAnalysis(Baseline):
     def __init__(self):
@@ -187,9 +169,6 @@ class FactorAnalysis(Baseline):
                 print "Factor analysis failed with message: {}".format(e.message)
             nll = np.nan
         return self.report_scores(nll, n_iter)
-
-    def get_name(self):
-        return 'FactorAnalysis'
 
 
 class GraphLasso(Baseline):
@@ -230,9 +209,6 @@ class GraphLasso(Baseline):
             scores = np.nan
         return self.report_scores(scores, n_iter)
 
-    def get_name(self):
-        return 'GraphLasso'
-
 
 class LinearCorex(Baseline):
     def __init__(self):
@@ -267,9 +243,6 @@ class LinearCorex(Baseline):
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
-
-    def get_name(self):
-        return "LinearCorex"
 
 
 class TimeVaryingCorex(Baseline):
@@ -320,9 +293,6 @@ class TimeVaryingCorex(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
-    def get_name(self):
-        return 'TimeVaryingCorex'
-
 
 class TimeVaryingCorexW(Baseline):
     def __init__(self):
@@ -372,8 +342,54 @@ class TimeVaryingCorexW(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
-    def get_name(self):
-        return 'TimeVaryingCorexW'
+
+class TimeVaryingCorexWWT(Baseline):
+    def __init__(self):
+        super(TimeVaryingCorexWWT, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print "Selecting the best parameter values for Time Varying Linear Corex (WWT) ..."
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params)
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
+                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                                   'max_iter': params['max_iter'], 'anneal': True})
+                cur_params['l1'] = 0
+                cur_params['l2'] = 0
+                cur_params[reg_param[0]] = reg_param[1]
+                if best_params is None:
+                    best_params = cur_params  # just to select one valid set of parameters
+                cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                if not np.isnan(cur_score) and cur_score < best_score:
+                    best_score = cur_score
+                    best_params = cur_params
+                done += 1
+        print "\n"
+        return best_params
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print "Evaluating time-varying corex (WWT) for {} iterations ...".format(n_iter)
+        scores = []
+        for iteration in range(n_iter):
+            c = theano_time_corex.TimeCorexWWT(nt=params['nt'],
+                                               nv=params['nv'],
+                                               n_hidden=params['n_hidden'],
+                                               max_iter=params['max_iter'],
+                                               anneal=params['anneal'],
+                                               l1=params['l1'],
+                                               l2=params['l2'])
+            c.fit(train_data)
+            covs = c.get_covariance()
+            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+            scores.append(cur_nll)
+        return self.report_scores(scores, n_iter)
 
 
 class TimeVaryingCorexMI(Baseline):
@@ -424,9 +440,6 @@ class TimeVaryingCorexMI(Baseline):
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
 
-    def get_name(self):
-        return 'TimeVaryingCorexMI'
-
 
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self):
@@ -474,6 +487,3 @@ class TimeVaryingGraphLasso(Baseline):
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
         return self.report_scores(scores, n_iter)
-
-    def get_name(self):
-        return 'TimeVaryingGraphLasso'

@@ -34,7 +34,8 @@ def main():
         with open(args.load_experiment, 'r') as f:
             loaded_exp_data = cPickle.load(f)
             for k, v in loaded_exp_data.iteritems():
-                exp_data[k] = v
+                if k != 'prefix':
+                    exp_data[k] = v
     else:
         if args.data_type == 'syn_nglf_buckets':
             (data1, sigma1) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
@@ -61,25 +62,25 @@ def main():
             args.test_data = [x[-args.test_cnt:] for x in data]
 
     methods = [
-        (baselines.GroundTruth(covs=args.ground_truth_covs), {}),
+        (baselines.GroundTruth(covs=args.ground_truth_covs), {}, "Ground Truth"),
 
-        (baselines.Diagonal(), {}),
+        (baselines.Diagonal(), {}), "Diagonal",
 
-        (baselines.LedoitWolf(), {}),
+        (baselines.LedoitWolf(), {}, "Ledoit-Wolf"),
 
-        (baselines.OAS(), {}),
+        (baselines.OAS(), {}, "Oracle approximating shrinkage"),
 
-        (baselines.PCA(), {'n_components': [args.m]}),
+        (baselines.PCA(), {'n_components': [args.m]}, "PCA"),
 
-        (baselines.FactorAnalysis(), {'n_components': [args.m]}),
+        (baselines.FactorAnalysis(), {'n_components': [args.m]}, "Factor Analysis"),
 
         (baselines.GraphLasso(), {'alpha': [0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
                                   'mode': 'lars',
-                                  'max_iter': 100}),
+                                  'max_iter': 100}, "Graphical LASSO"),
 
         (baselines.LinearCorex(), {'n_hidden': [args.m],
                                    'max_iter': 500,
-                                   'anneal': True}),
+                                   'anneal': True}, "Linear CorEx"),
 
         (baselines.TimeVaryingCorex(), {'nt': args.nt,
                                         'nv': args.nv,
@@ -87,7 +88,7 @@ def main():
                                         'max_iter': 500,
                                         'anneal': True,
                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                        'l2': []}),
+                                        'l2': []}, "Time-Varying Linear CorEx (Sigma)"),
 
         (baselines.TimeVaryingCorexW(), {'nt': args.nt,
                                          'nv': args.nv,
@@ -95,7 +96,7 @@ def main():
                                          'max_iter': 500,
                                          'anneal': True,
                                          'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                         'l2': []}),
+                                         'l2': []}, "Time-Varying Linear CorEx (W)"),
 
         (baselines.TimeVaryingCorexMI(), {'nt': args.nt,
                                           'nv': args.nv,
@@ -103,19 +104,32 @@ def main():
                                           'max_iter': 500,
                                           'anneal': True,
                                           'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                          'l2': []}),
+                                          'l2': []}, "Time-Varying Linear CorEx (MI)"),
+
+        (baselines.TimeVaryingCorexWWT(), {'nt': args.nt,
+                                           'nv': args.nv,
+                                           'n_hidden': [args.m],
+                                           'max_iter': 500,
+                                           'anneal': True,
+                                           'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                           'l2': []}, "Time-Varying Linear CorEx (WWT)"),
 
         (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
                                              'beta': [0.01, 0.03, 0.1, 0.3],
                                              'indexOfPenalty': [1],  # TODO: extend grid of this one
-                                             'max_iter': 30})  # TODO: make this more
+                                             'max_iter': 30}, "Time-Varying GLASSO"),
+
+        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
+                                             'beta': [0.0],
+                                             'indexOfPenalty': [1],
+                                             'max_iter': 30}, "Time-Varying GLASSO (no reg)")
     ]
 
     results = {}
-    for (method, params) in methods:
+    for (method, params, name) in methods[-1:]:
         best_params = method.select(args.train_data, args.val_data, params)
-        results[method.get_name()] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
-        results[method.get_name()]['best_params'] = best_params
+        results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
+        results[name]['best_params'] = best_params
 
     print "Saving the data and parameters of the experiment ..."
     exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
