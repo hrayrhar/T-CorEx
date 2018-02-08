@@ -36,7 +36,8 @@ class GroundTruth(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Empty model selection for ground truth baseline"
-        return {}
+        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
+        return ({}, score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -51,7 +52,8 @@ class Diagonal(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Empty model selection of diagonal baseline"
-        return {}
+        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
+        return ({}, score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -67,7 +69,8 @@ class LedoitWolf(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Empty model selection of Ledoit-Wolf baseline"
-        return {}
+        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
+        return ({}, score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -87,7 +90,8 @@ class OAS(Baseline):
 
     def select(self, train_data, val_data, params):
         print "Empty model selection of oracle approximating shrinkage baseline"
-        return {}
+        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
+        return ({}, score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=False):
         if verbose:
@@ -117,7 +121,7 @@ class PCA(Baseline):
             if not np.isnan(cur_score) and cur_score < best_score:
                 best_score = cur_score
                 best_params = cur_params
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -152,7 +156,7 @@ class FactorAnalysis(Baseline):
             if not np.isnan(cur_score) and cur_score < best_score:
                 best_score = cur_score
                 best_params = cur_params
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -187,7 +191,7 @@ class GraphLasso(Baseline):
             if not np.isnan(cur_score) and cur_score < best_score:
                 best_score = cur_score
                 best_params = cur_params
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -226,7 +230,7 @@ class LinearCorex(Baseline):
             if not np.isnan(cur_score) and cur_score < best_score:
                 best_score = cur_score
                 best_params = cur_params
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -273,7 +277,7 @@ class TimeVaryingCorex(Baseline):
                     best_params = cur_params
                 done += 1
         print "\n"
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -322,7 +326,7 @@ class TimeVaryingCorexW(Baseline):
                     best_params = cur_params
                 done += 1
         print "\n"
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -371,7 +375,7 @@ class TimeVaryingCorexWWT(Baseline):
                     best_params = cur_params
                 done += 1
         print "\n"
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -420,7 +424,7 @@ class TimeVaryingCorexMI(Baseline):
                     best_params = cur_params
                 done += 1
         print "\n"
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
@@ -465,7 +469,7 @@ class TimeVaryingGraphLasso(Baseline):
                         best_params = cur_params
                     done += 1
         print "\n"
-        return best_params
+        return (best_params, best_score)
 
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
