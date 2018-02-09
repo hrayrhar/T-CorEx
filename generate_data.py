@@ -2,8 +2,8 @@ from scipy.stats import multivariate_normal
 from sklearn.datasets import make_spd_matrix
 
 import numpy as np
+np.random.seed(42)
 import sklearn.covariance as skcov
-import random
 
 
 def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, max_var=4.0):
