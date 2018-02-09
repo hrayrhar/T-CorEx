@@ -7,7 +7,12 @@ def make_buckets(ts_data, window):
     for i in range(nt):
         l = max(0, i - window)
         r = l + 2*window + 1
-        ret.append(ts_data[l:r])
+        if r <= nt:
+            ret.append(ts_data[l:r])
+        else:
+            r = min(nt-1, i+window)
+            l = r - 2*window - 1
+            ret.append(ts_data[l+1:r+1])
     return ret
 
 

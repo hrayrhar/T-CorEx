@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--snr', type=float, default=None, help='signal to noise ratio')
     parser.add_argument('--min_var', type=float, default=1.0, help='minimum x-variance')
     parser.add_argument('--max_var', type=float, default=1.0, help='maximum x-variance')
-    parser.add_argument('--eval_iter', type=int, default=5, help='number of evaluation iterations')
+    parser.add_argument('--eval_iter', type=int, default=1, help='number of evaluation iterations')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
     parser.add_argument('--data_type', dest='data_type', action='store', default='syn_nglf_buckets',
                         choices=['syn_nglf_buckets', 'syn_general_buckets', 'syn_nglf_ts',
@@ -36,7 +36,7 @@ def main():
         with open(args.load_experiment, 'r') as f:
             loaded_exp_data = cPickle.load(f)
             for k, v in loaded_exp_data.iteritems():
-                if k != 'prefix':
+                if k not in ['prefix', 'eval_iter']:
                     exp_data[k] = v
     else:
         if args.data_type in ['syn_nglf_buckets', 'syn_general_buckets']:
@@ -135,7 +135,7 @@ def main():
     ]
 
     results = {}
-    for (method, params, name) in methods:
+    for (method, params, name) in methods[-2:]:
         if not is_time_series:  # buckets
             best_params, best_score = method.select(args.train_data, args.val_data, params)
             results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)

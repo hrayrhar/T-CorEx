@@ -51,7 +51,7 @@ def mean_impute(x, v):
 
 class TimeCorex(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
-                 discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0,
+                 discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0, update_iter=10,
                  verbose=False, seed=None):
 
         self.nt = nt  # Number of timesteps
@@ -70,6 +70,7 @@ class TimeCorex(object):
             cm.cublas_init()
 
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
+        self.update_iter = update_iter  # Compute statistics every update_iter
         np.random.seed(seed)  # Set seed for deterministic results
         self.verbose = verbose
         if verbose:
@@ -103,7 +104,7 @@ class TimeCorex(object):
                 obj = ret[0]
                 reg_obj = ret[2]
 
-                if i_loop % 10 == 0 and self.verbose:
+                if i_loop % self.update_iter == 0 and self.verbose:
                     self.moments = self._calculate_moments(x, self.ws, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, reg = {}, eps = {}".format(np.sum(self.tc),
