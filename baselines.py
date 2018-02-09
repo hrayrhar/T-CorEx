@@ -4,6 +4,7 @@ import metric_utils
 import linearcorex
 import theano_time_corex
 import numpy as np
+import time
 
 import sys
 sys.path.append('../TVGL')
@@ -42,7 +43,10 @@ class GroundTruth(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating ground truth baseline ..."
+        start_time = time.time()
         nll = metric_utils.calculate_nll_score(data=test_data, covs=self.covs)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -58,8 +62,11 @@ class Diagonal(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating diagonal baseline ..."
+        start_time = time.time()
         covs = [np.diag(np.var(x, axis=0)) for x in train_data]
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -75,12 +82,15 @@ class LedoitWolf(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating Ledoit-Wolf baselines ..."
+        start_time = time.time()
         covs = []
         for x in train_data:
             est = sk_cov.LedoitWolf()
             est.fit(x)
             covs.append(est.covariance_)
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -96,12 +106,15 @@ class OAS(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=False):
         if verbose:
             print "Evaluating oracle approximating shrinkage baselines ..."
+        start_time = time.time()
         covs = []
         for x in train_data:
             est = sk_cov.OAS()
             est.fit(x)
             covs.append(est.covariance_)
         nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -126,6 +139,7 @@ class PCA(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating PCA ..."
+        start_time = time.time()
         try:
             covs = []
             for x in train_data:
@@ -137,6 +151,8 @@ class PCA(Baseline):
             if verbose:
                 print "PCA failed with message: {}".format(e.message)
             nll = np.nan
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -161,6 +177,7 @@ class FactorAnalysis(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating Factor Analysis ..."
+        start_time = time.time()
         try:
             covs = []
             for x in train_data:
@@ -172,6 +189,8 @@ class FactorAnalysis(Baseline):
             if verbose:
                 print "Factor analysis failed with message: {}".format(e.message)
             nll = np.nan
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)
 
 
@@ -196,6 +215,7 @@ class GraphLasso(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating grahical LASSO for {} iterations ...".format(n_iter)
+        start_time = time.time()
         try:
             scores = []
             for iteration in range(n_iter):
@@ -211,6 +231,8 @@ class GraphLasso(Baseline):
             if verbose:
                 print "Graphical Lasso failed with message: {}".format(e.message)
             scores = np.nan
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -235,6 +257,7 @@ class LinearCorex(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating linear corex for {} iterations ...".format(n_iter)
+        start_time = time.time()
         scores = []
         for iteration in range(n_iter):
             covs = []
@@ -246,6 +269,8 @@ class LinearCorex(Baseline):
                 covs.append(c.get_covariance())
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -282,6 +307,7 @@ class TimeVaryingCorex(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating time-varying corex for {} iterations ...".format(n_iter)
+        start_time = time.time()
         scores = []
         for iteration in range(n_iter):
             c = theano_time_corex.TimeCorexSigma(nt=params['nt'],
@@ -295,6 +321,8 @@ class TimeVaryingCorex(Baseline):
             covs = c.get_covariance()
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -331,6 +359,7 @@ class TimeVaryingCorexW(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating time-varying corex (W) for {} iterations ...".format(n_iter)
+        start_time = time.time()
         scores = []
         for iteration in range(n_iter):
             c = theano_time_corex.TimeCorexW(nt=params['nt'],
@@ -344,6 +373,8 @@ class TimeVaryingCorexW(Baseline):
             covs = c.get_covariance()
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -380,6 +411,7 @@ class TimeVaryingCorexWWT(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating time-varying corex (WWT) for {} iterations ...".format(n_iter)
+        start_time = time.time()
         scores = []
         for iteration in range(n_iter):
             c = theano_time_corex.TimeCorexWWT(nt=params['nt'],
@@ -393,6 +425,8 @@ class TimeVaryingCorexWWT(Baseline):
             covs = c.get_covariance()
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -429,6 +463,7 @@ class TimeVaryingCorexMI(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating time-varying corex (MI) for {} iterations ...".format(n_iter)
+        start_time = time.time()
         scores = []
         for iteration in range(n_iter):
             c = theano_time_corex.TimeCorexGlobalMI(nt=params['nt'],
@@ -442,6 +477,8 @@ class TimeVaryingCorexMI(Baseline):
             covs = c.get_covariance()
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
 
 
@@ -474,6 +511,7 @@ class TimeVaryingGraphLasso(Baseline):
     def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
         if verbose:
             print "Evaluating time-varying graphical LASSO for {} iterations ...".format(n_iter)
+        start_time = time.time()
         # construct time-series
         train_data_ts = []
         for x in train_data:
@@ -490,4 +528,6 @@ class TimeVaryingGraphLasso(Baseline):
             covs = [np.linalg.inv(x) for x in inv_covs]
             cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
             scores.append(cur_nll)
+        finish_time = time.time()
+        print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(scores, n_iter)
