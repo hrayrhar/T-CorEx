@@ -99,13 +99,13 @@ def main():
                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                         'l2': []}, "Time-Varying Linear CorEx (Sigma)"),
 
-        # (baselines.TimeVaryingCorexW(), {'nt': args.nt,
-        #                                  'nv': args.nv,
-        #                                  'n_hidden': [args.m],
-        #                                  'max_iter': 500,
-        #                                  'anneal': True,
-        #                                  'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #                                  'l2': []}, "Time-Varying Linear CorEx (W)"),
+        (baselines.TimeVaryingCorexW(), {'nt': args.nt,
+                                         'nv': args.nv,
+                                         'n_hidden': [args.m],
+                                         'max_iter': 500,
+                                         'anneal': True,
+                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                         'l2': []}, "Time-Varying Linear CorEx (W)"),
 
         # (baselines.TimeVaryingCorexMI(), {'nt': args.nt,
         #                                   'nv': args.nv,
@@ -115,13 +115,13 @@ def main():
         #                                   'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
         #                                   'l2': []}, "Time-Varying Linear CorEx (MI)"),
 
-        # (baselines.TimeVaryingCorexWWT(), {'nt': args.nt,
-        #                                    'nv': args.nv,
-        #                                    'n_hidden': [args.m],
-        #                                    'max_iter': 500,
-        #                                    'anneal': True,
-        #                                    'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #                                    'l2': []}, "Time-Varying Linear CorEx (WWT)"),
+        (baselines.TimeVaryingCorexWWT(), {'nt': args.nt,
+                                           'nv': args.nv,
+                                           'n_hidden': [args.m],
+                                           'max_iter': 500,
+                                           'anneal': True,
+                                           'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                           'l2': []}, "Time-Varying Linear CorEx (WWT)"),
 
         (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
                                              'beta': [0.01, 0.03, 0.1, 0.3],
@@ -135,7 +135,7 @@ def main():
     ]
 
     results = {}
-    for (method, params, name) in methods[-2:]:
+    for (method, params, name) in methods:
         if not is_time_series:  # buckets
             best_params, best_score = method.select(args.train_data, args.val_data, params)
             results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
