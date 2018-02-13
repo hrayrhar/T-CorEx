@@ -6,7 +6,7 @@ np.random.seed(42)
 import sklearn.covariance as skcov
 
 
-def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, max_var=4.0):
+def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
     """ Generates data according to an NGLF model.
 
     :param nv:      Number of observed variables
@@ -30,7 +30,7 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, 
     cor_signs = np.sign(np.random.normal(size=(nv,)))
 
     if snr is None:
-        cor = cor_signs * np.random.uniform(min_cor, 1.0, size=(nv,))
+        cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
         snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
         print "Average SNR: {}".format(snr)
     else:
