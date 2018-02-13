@@ -17,6 +17,8 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
                     If `snr` is none `min_cor` will be used
     :param min_cor: Minimum absolute value of correlations between x_i and z_j.
                     This will not be used if `snr` is not none.
+    :param max_cor: Maximum absolute value of correlations between x_i and z_j.
+                    This will not be used if `snr` is not none.
     :param min_var: Minimum variance of x_i.
     :param max_var: Maximum variance of x_i.
     :return: (data, ground_truth_cov)
@@ -134,7 +136,7 @@ def generate_general_make_spd(nv, m, nt, ns, normalize=False):
              for t in range(nt)], sigma)
 
 
-def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, max_var=4.0):
+def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
     """ Generates data according to an NGLF model.
 
     :param nv:      Number of observed variables
@@ -144,6 +146,8 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, 
     :param snr:     Signal to noise ratio.
                     If `snr` is none `min_cor` will be used
     :param min_cor: Minimum absolute value of correlations between x_i and z_j.
+                    This will not be used if `snr` is not none.
+    :param max_cor: Maximum absolute value of correlations between x_i and z_j.
                     This will not be used if `snr` is not none.
     :param min_var: Minimum variance of x_i.
     :param max_var: Maximum variance of x_i.
@@ -159,7 +163,7 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, min_var=1.0, 
         cor_signs = np.sign(np.random.normal(size=(nv,)))
 
         if snr is None:
-            cor = cor_signs * np.random.uniform(min_cor, 1.0, size=(nv,))
+            cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
             snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
             print "Average SNR: {}".format(snr)
         else:

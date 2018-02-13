@@ -67,7 +67,8 @@ def main():
         if args.data_type in ['syn_nglf_ts']:
             (args.ts_data, args.test_data, args.ground_truth_covs) = generate_nglf_timeseries(
                 nv=args.nv, m=args.m, nt=args.nt, ns=args.test_cnt, snr=args.snr,
-                min_cor=0.8, min_var=args.min_var, max_var=args.max_var)
+                min_cor=args.min_cor, max_cor=args.max_cor,
+                min_var=args.min_var, max_var=args.max_var)
 
     is_time_series = True
     if args.data_type.find('bucket') != -1:
