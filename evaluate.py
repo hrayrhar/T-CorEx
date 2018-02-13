@@ -195,8 +195,14 @@ def main():
 
     ''' Save the data and results '''
     print "Saving the data and parameters of the experiment ..."
-    exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
-        args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
+    if args.snr:
+        exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
+            args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
+    else:
+        exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.min_cor{:.2f}.max_cor{:.2f}'.format(
+            args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt,
+            args.min_cor, args.max_cor)
+
     if args.prefix != '':
         exp_name = args.prefix + '.' + exp_name
 
