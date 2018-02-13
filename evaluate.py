@@ -85,7 +85,7 @@ def main():
 
         (baselines.FactorAnalysis(), {'n_components': [args.m]}, "Factor Analysis"),
 
-        (baselines.GraphLasso(), {'alpha': [0.03, 0.1, 0.3, 1, 3],
+        (baselines.GraphLasso(), {'alpha': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
                                   'mode': 'lars',
                                   'max_iter': 100}, "Graphical LASSO"),
 
@@ -93,44 +93,40 @@ def main():
                                    'max_iter': 500,
                                    'anneal': True}, "Linear CorEx"),
 
-        (baselines.TimeVaryingCorex(), {'nt': args.nt,
-                                        'nv': args.nv,
+        (baselines.TimeVaryingCorex(), {'nv': args.nv,
                                         'n_hidden': [args.m],
                                         'max_iter': 500,
                                         'anneal': True,
                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                         'l2': []}, "Time-Varying Linear CorEx (Sigma)"),
 
-        (baselines.TimeVaryingCorexW(), {'nt': args.nt,
-                                         'nv': args.nv,
+        (baselines.TimeVaryingCorexW(), {'nv': args.nv,
                                          'n_hidden': [args.m],
                                          'max_iter': 500,
                                          'anneal': True,
-                                         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                         'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                          'l2': []}, "Time-Varying Linear CorEx (W)"),
 
-        # (baselines.TimeVaryingCorexMI(), {'nt': args.nt,
-        #                                   'nv': args.nv,
+        # (baselines.TimeVaryingCorexMI(), {'nv': args.nv,
         #                                   'n_hidden': [args.m],
         #                                   'max_iter': 500,
         #                                   'anneal': True,
         #                                   'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
         #                                   'l2': []}, "Time-Varying Linear CorEx (MI)"),
 
-        (baselines.TimeVaryingCorexWWT(), {'nt': args.nt,
-                                           'nv': args.nv,
+        (baselines.TimeVaryingCorexWWT(), {'nv': args.nv,
                                            'n_hidden': [args.m],
                                            'max_iter': 500,
                                            'anneal': True,
-                                           'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                           'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                            'l2': []}, "Time-Varying Linear CorEx (WWT)"),
 
         (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
-                                             'beta': [0.01, 0.03, 0.1, 0.3],
+                                             'beta': [0.03, 0.1, 0.3, 1.0],
                                              'indexOfPenalty': [1],  # TODO: extend grid of this one
                                              'max_iter': 30}, "Time-Varying GLASSO"),
 
-        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
+        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
                                              'beta': [0.0],
                                              'indexOfPenalty': [1],
                                              'max_iter': 30}, "Time-Varying GLASSO (no reg)")
@@ -165,7 +161,7 @@ def main():
                     train_data = []
                     val_data = []
                     for t in range(len(data)):
-                        cur_train, cur_val = train_test_split(data[t], test_size=1)
+                        cur_train, cur_val = train_test_split(data[t], test_size=max(1, int(0.15 * len(data[t]))))
                         train_data.append(cur_train)
                         val_data.append(cur_val)
 

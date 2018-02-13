@@ -290,7 +290,7 @@ class TimeVaryingCorex(Baseline):
         for n_hidden in params['n_hidden']:
             for reg_param in reg_params:
                 print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
-                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
                                    'max_iter': params['max_iter'], 'anneal': True})
                 cur_params['l1'] = 0
                 cur_params['l2'] = 0
@@ -342,7 +342,7 @@ class TimeVaryingCorexW(Baseline):
         for n_hidden in params['n_hidden']:
             for reg_param in reg_params:
                 print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
-                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
                                    'max_iter': params['max_iter'], 'anneal': True})
                 cur_params['l1'] = 0
                 cur_params['l2'] = 0
@@ -394,7 +394,7 @@ class TimeVaryingCorexWWT(Baseline):
         for n_hidden in params['n_hidden']:
             for reg_param in reg_params:
                 print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
-                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
                                    'max_iter': params['max_iter'], 'anneal': True})
                 cur_params['l1'] = 0
                 cur_params['l2'] = 0
@@ -446,7 +446,7 @@ class TimeVaryingCorexMI(Baseline):
         for n_hidden in params['n_hidden']:
             for reg_param in reg_params:
                 print "\rdone {} / {} {}".format(done, grid_size, ' '*10)
-                cur_params = dict({'nt': params['nt'], 'nv': params['nv'], 'n_hidden': n_hidden,
+                cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
                                    'max_iter': params['max_iter'], 'anneal': True})
                 cur_params['l1'] = 0
                 cur_params['l2'] = 0
