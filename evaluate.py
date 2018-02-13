@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
     parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')
     parser.add_argument('--snr', type=float, default=None, help='signal to noise ratio')
+    parser.add_argument('--min_cor', type=float, default=0.8, help='minimum correlation between a child and parent')
+    parser.add_argument('--max_cor', type=float, default=1.0, help='minimum correlation between a child and parent')
     parser.add_argument('--min_var', type=float, default=1.0, help='minimum x-variance')
     parser.add_argument('--max_var', type=float, default=1.0, help='maximum x-variance')
     parser.add_argument('--eval_iter', type=int, default=1, help='number of evaluation iterations')
