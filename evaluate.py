@@ -46,10 +46,12 @@ def main():
             if args.data_type == 'syn_nglf_buckets':
                 (data1, sigma1) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
                                                            ns=args.train_cnt + args.val_cnt + args.test_cnt,
-                                                           snr=args.snr, min_var=args.min_var, max_var=args.max_var)
+                                                           snr=args.snr, min_var=args.min_var, max_var=args.max_var,
+                                                           min_cor=args.min_cor, max_cor=args.max_cor)
                 (data2, sigma2) = generate_nglf_from_model(args.nv, args.m, args.nt // 2,
                                                            ns=args.train_cnt + args.val_cnt + args.test_cnt,
-                                                           snr=args.snr, min_var=args.min_var, max_var=args.max_var)
+                                                           snr=args.snr, min_var=args.min_var, max_var=args.max_var,
+                                                           min_cor=args.min_cor, max_cor=args.max_cor)
             else:
                 (data1, sigma1) = generate_general_make_spd(args.nv, args.m, args.nt // 2,
                                                             ns=args.train_cnt + args.val_cnt + args.test_cnt)
