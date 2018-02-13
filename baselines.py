@@ -311,7 +311,7 @@ class TimeVaryingCorex(Baseline):
         start_time = time.time()
         scores = []
         for iteration in range(n_iter):
-            c = theano_time_corex.TimeCorexSigma(nt=params['nt'],
+            c = theano_time_corex.TimeCorexSigma(nt=len(train_data),
                                                  nv=params['nv'],
                                                  n_hidden=params['n_hidden'],
                                                  max_iter=params['max_iter'],
@@ -363,7 +363,7 @@ class TimeVaryingCorexW(Baseline):
         start_time = time.time()
         scores = []
         for iteration in range(n_iter):
-            c = theano_time_corex.TimeCorexW(nt=params['nt'],
+            c = theano_time_corex.TimeCorexW(nt=len(train_data),
                                              nv=params['nv'],
                                              n_hidden=params['n_hidden'],
                                              max_iter=params['max_iter'],
@@ -415,7 +415,7 @@ class TimeVaryingCorexWWT(Baseline):
         start_time = time.time()
         scores = []
         for iteration in range(n_iter):
-            c = theano_time_corex.TimeCorexWWT(nt=params['nt'],
+            c = theano_time_corex.TimeCorexWWT(nt=len(train_data),
                                                nv=params['nv'],
                                                n_hidden=params['n_hidden'],
                                                max_iter=params['max_iter'],
@@ -467,7 +467,7 @@ class TimeVaryingCorexMI(Baseline):
         start_time = time.time()
         scores = []
         for iteration in range(n_iter):
-            c = theano_time_corex.TimeCorexGlobalMI(nt=params['nt'],
+            c = theano_time_corex.TimeCorexGlobalMI(nt=len(train_data),
                                                     nv=params['nv'],
                                                     n_hidden=params['n_hidden'],
                                                     max_iter=params['max_iter'],
