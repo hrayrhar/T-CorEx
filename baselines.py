@@ -31,9 +31,10 @@ class Baseline(object):
 
 
 class GroundTruth(Baseline):
-    def __init__(self, covs):
+    def __init__(self, covs, test_data):
         super(GroundTruth, self).__init__()
         self.covs = covs
+        self.test_data = test_data
 
     def select(self, train_data, val_data, params):
         print "Empty model selection for ground truth baseline"
@@ -44,7 +45,7 @@ class GroundTruth(Baseline):
         if verbose:
             print "Evaluating ground truth baseline ..."
         start_time = time.time()
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=self.covs)
+        nll = metric_utils.calculate_nll_score(data=self.test_data, covs=self.covs)
         finish_time = time.time()
         print "\tElapsed time {:.1f}s".format(finish_time - start_time)
         return self.report_scores(nll, n_iter)

@@ -1,4 +1,4 @@
-from generate_data import generate_nglf_from_matrix, generate_nglf_from_model,\
+from generate_data import generate_nglf_from_matrix, generate_nglf_from_model, \
     generate_general_make_spd, generate_nglf_timeseries
 from misc_utils import make_sure_path_exists, make_buckets
 from sklearn.model_selection import train_test_split
@@ -31,6 +31,7 @@ def main():
     exp_data = vars(args)
     exp_data['nv'] = exp_data['m'] * exp_data['bs']
 
+    ''' Load experiment data'''
     if args.load_experiment:
         print "Loading previously saved data from {} ...".format(args.load_experiment)
         with open(args.load_experiment, 'r') as f:
@@ -67,11 +68,12 @@ def main():
     is_time_series = True
     if args.data_type.find('bucket') != -1:
         is_time_series = False
-    # windows = [3, 4, 6, 8, 12, 16]
     windows = [4, 8, 12]
+    strides = ['one', 'half', 'full']
 
+    ''' Define baselines and the grid of parameters '''
     methods = [
-        (baselines.GroundTruth(covs=args.ground_truth_covs), {}, "Ground Truth"),
+        (baselines.GroundTruth(covs=args.ground_truth_covs, test_data=args.test_data), {}, "Ground Truth"),
 
         (baselines.Diagonal(), {}, "Diagonal"),
 
@@ -136,42 +138,61 @@ def main():
 
     results = {}
     for (method, params, name) in methods:
-        if not is_time_series:  # buckets
+        if not is_time_series:
+            ''' Buckets '''
             best_params, best_score = method.select(args.train_data, args.val_data, params)
             results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
             results[name]['best_params'] = best_params
-        else:  # time-series
-            results_per_window = []
-            best_score = 1e18
+        else:
+            ''' Time-series '''
+            results_per_window_and_stride = []
+            best_val_score = 1e18
             best_params = None
             best_window = None
+            best_stride = None
+
             for window in windows:
-                if 2*window + 1 > len(args.ts_data):
-                    continue
-                data = make_buckets(args.ts_data, window)
-                train_data = []
-                val_data = []
-                for t in range(len(data)):
-                    A, B = train_test_split(data[t], test_size=1)
-                    train_data.append(A)
-                    val_data.append(B)
-                cur_best_params, cur_best_score = method.select(train_data, val_data, params)
-                if best_params is None or cur_best_score < best_score:
-                    best_params = cur_best_params
-                    best_score = cur_best_score
-                    best_window = window
-                # evaluate on the test set
-                test_scores = method.evaluate(train_data, args.test_data, cur_best_params, args.eval_iter)
-                test_scores['window'] = window
-                test_scores['val_score'] = cur_best_score
-                test_scores['best_params_for_this_window'] = cur_best_params
-                results_per_window.append(test_scores)
-            train_data = make_buckets(args.ts_data, best_window)
-            results[name] = method.evaluate(train_data, args.test_data, best_params, args.eval_iter)
+                for stride in strides:
+                    # use all static models with stride = 'minimum'
+                    if name.lower().find('time') == -1 and stride != 'one':
+                        continue
+
+                    ''' Make bucketed data and split it into training and validation sets '''
+                    data, test_data = make_buckets(args.ts_data, args.test_data, window, stride)
+                    if len(data) == 1:  # the window size is too big
+                        continue
+
+                    train_data = []
+                    val_data = []
+                    for t in range(len(data)):
+                        cur_train, cur_val = train_test_split(data[t], test_size=1)
+                        train_data.append(cur_train)
+                        val_data.append(cur_val)
+
+                    ''' Select hyper-parameters other than window and stride '''
+                    cur_best_params, cur_best_val_score = method.select(train_data, val_data, params)
+                    if best_params is None or cur_best_val_score < best_val_score:
+                        best_params = cur_best_params
+                        best_val_score = cur_best_val_score
+                        best_window = window
+                        best_stride = stride
+
+                    ''' Evaluate on the test set '''
+                    test_scores = method.evaluate(train_data, test_data, cur_best_params, args.eval_iter)
+                    test_scores['window'] = window
+                    test_scores['stride'] = stride
+                    test_scores['cur_best_val_score'] = cur_best_val_score
+                    test_scores['cur_best_params'] = cur_best_params
+                    results_per_window_and_stride.append(test_scores)
+
+            train_data, test_data = make_buckets(args.ts_data, args.test_data, best_window, best_stride)
+            results[name] = method.evaluate(train_data, test_data, best_params, args.eval_iter)
             results[name]['best_params'] = best_params
             results[name]['best_window'] = best_window
-            results[name]['results_per_window'] = results_per_window
+            results[name]['best_stride'] = best_stride
+            results[name]['results_per_window_and_stride'] = results_per_window_and_stride
 
+    ''' Save the data and results '''
     print "Saving the data and parameters of the experiment ..."
     exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
         args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
