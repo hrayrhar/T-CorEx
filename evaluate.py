@@ -141,6 +141,7 @@ def main():
             results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
             results[name]['best_params'] = best_params
         else:  # time-series
+            results_per_window = []
             best_score = 1e18
             best_params = None
             best_window = None
@@ -159,10 +160,17 @@ def main():
                     best_params = cur_best_params
                     best_score = cur_best_score
                     best_window = window
+                # evaluate on the test set
+                test_scores = method.evaluate(train_data, args.test_data, cur_best_params, args.eval_iter)
+                test_scores['window'] = window
+                test_scores['val_score'] = cur_best_score
+                test_scores['best_params_for_this_window'] = cur_best_params
+                results_per_window.append(test_scores)
             train_data = make_buckets(args.ts_data, best_window)
             results[name] = method.evaluate(train_data, args.test_data, best_params, args.eval_iter)
             results[name]['best_params'] = best_params
             results[name]['best_window'] = best_window
+            results[name]['results_per_window'] = results_per_window
 
     print "Saving the data and parameters of the experiment ..."
     exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
