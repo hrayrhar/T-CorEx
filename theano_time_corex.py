@@ -52,7 +52,7 @@ def mean_impute(x, v):
 class TimeCorex(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False, y_scale=1.0, update_iter=10,
-                 verbose=False, seed=None):
+                 pretrained_weights=None, verbose=False, seed=None):
 
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
@@ -71,6 +71,7 @@ class TimeCorex(object):
 
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
         self.update_iter = update_iter  # Compute statistics every update_iter
+        self.pretrained_weights = pretrained_weights
         np.random.seed(seed)  # Set seed for deterministic results
         self.verbose = verbose
         if verbose:
@@ -81,15 +82,18 @@ class TimeCorex(object):
         self.rng = RandomStreams(seed)
 
     def fit(self, x):
+        # TODO: write a stopping condition
         x = [np.array(xt, dtype=np.float32) for xt in x]
         x = self.preprocess(x, fit=True)  # Fit a transform for each marginal
-        self.x_std = x  # to have an access to standardalized x
+        self.x_std = x  # to have an access to standardized x
 
         anneal_schedule = [0.]
         if self.anneal:
             anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
 
-        self._define_model()
+        if self.pretrained_weights is not None:
+            for cur_w, pre_w in zip(self.ws, self.pretrained_weights):
+                cur_w.set_value(pre_w)
 
         for i_eps, eps in enumerate(anneal_schedule):
             start_time = time.time()
@@ -343,6 +347,7 @@ class TimeCorexW(TimeCorex):
         super(TimeCorexW, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
+        self._define_model()
 
     def _define_model(self):
 
@@ -423,6 +428,7 @@ class TimeCorexWWT(TimeCorex):
         super(TimeCorexWWT, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
+        self._define_model()
 
     def _define_model(self):
 
@@ -507,6 +513,7 @@ class TimeCorexGlobalMI(TimeCorex):
         super(TimeCorexGlobalMI, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
+        self._define_model()
 
     def _define_model(self):
 
@@ -582,6 +589,7 @@ class TimeCorexSigma(TimeCorex):
         super(TimeCorexSigma, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
+        self._define_model()
 
     def _define_model(self):
 
