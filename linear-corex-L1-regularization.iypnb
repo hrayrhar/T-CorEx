@@ -70,7 +70,9 @@
   {
    "cell_type": "code",
    "execution_count": 4,
-   "metadata": {},
+   "metadata": {
+    "collapsed": true
+   },
    "outputs": [],
    "source": [
     "m = 8\n",
@@ -358,7 +360,9 @@
   {
    "cell_type": "code",
    "execution_count": 110,
-   "metadata": {},
+   "metadata": {
+    "collapsed": true
+   },
    "outputs": [],
    "source": [
     "from theano_linear_corex_L1 import Corex"
