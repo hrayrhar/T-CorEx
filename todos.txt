@@ -1,0 +1,4 @@
+1. Find all TODOs in all .py files
+
+2. All regularization terms now use T.sum(), which creates difficulties for selecting the best value of reg. coefficient when the number of time-steps or the number of variables is changed. To fix this we need to make T.mean(). After this is done, we should define the new search values for reg. coefficient.
+
