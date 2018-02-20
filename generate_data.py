@@ -36,7 +36,7 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
         snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
         print "Average SNR: {}".format(snr)
     else:
-        cor = cor_signs * np.array([np.sqrt(snr / (snr + 1)) for i in range(nv)])
+        cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
         print "Fixed SNR: {}".format(snr)
 
     # Construct the ground truth covariance matrix of x
@@ -167,7 +167,7 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
             snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
             print "Average SNR: {}".format(snr)
         else:
-            cor = cor_signs * np.array([np.sqrt(snr / (snr + 1)) for i in range(nv)])
+            cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
             print "Fixed SNR: {}".format(snr)
         return (x_std, cor)
 
