@@ -141,7 +141,7 @@ class Corex:
             for i_loop in range(self.max_iter):
                 (obj, _) = self.train_step(x.astype(np.float32))
 
-                if i_loop % 15 == 0:
+                if self.verbose and i_loop % 15 == 0:
                     self.moments = self._calculate_moments(x, self.ws, quick=True)
                     self._update_u(x)
                     print "tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps)

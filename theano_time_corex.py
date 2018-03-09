@@ -7,6 +7,8 @@ from scipy.stats import norm, rankdata
 import time
 
 import lasagne
+import theano_linear_corex
+
 
 import gc
 
@@ -669,3 +671,168 @@ class TimeCorexSigma(TimeCorex):
 
         self.get_R = theano.function(inputs=self.x_wno,
                                      outputs=self.R)
+
+
+class TimeCorexWPrior(TimeCorex):
+    def __init__(self, l1=0.0, l2=0.0, lamb=0.5, **kwargs):
+        super(TimeCorexWPrior, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
+        self.lamb = lamb
+        self._define_model()
+
+    def _define_model(self):
+
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.z_mean = [None] * self.nt
+        self.z = [None] * self.nt
+
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns, self.m))
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+            self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
+            self.z[t] = self.z_mean[t] + z_noise
+
+        EPS = 1e-5
+        self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
+
+        self.z2_prior = [None] * self.nt
+        self.R_prior = [None] * self.nt
+
+        for t in range(self.nt):
+            self.z2_prior[t] = theano.shared(np.zeros((self.m,), dtype=np.float32), name='z2p_{}'.format(t))
+            self.R_prior[t] = theano.shared(np.zeros((self.m, self.nv), dtype=np.float32), name='Rp_{}'.format(t))
+
+            z2 = (self.z[t] ** 2).mean(axis=0)  # (m,)
+            ns = self.x_wno[t].shape[0]
+            R = T.dot(self.z[t].T, self.x[t]) / ns  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+
+            # add priors
+            z2 = (1 - self.lamb) * z2 + self.lamb * self.z2_prior[t]
+            R = (1 - self.lamb) * R + self.lamb * self.R_prior[t]
+
+            # the rest depends on R and z2 only
+            ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
+            # NOTE: we use z[t], but seems only for objective not for the covariance estimate
+            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+
+            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, EPS, 1)
+            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(self.ws[t + 1] - self.ws[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)
+
+        self.get_norm_covariance = theano.function(inputs=self.x_wno,
+                                                   outputs=self.sigma)
+
+    def fit(self, x):
+        # TODO: write a stopping condition
+
+        # fit a linear corex to get the priors
+        lin_corex = theano_linear_corex.Corex(nv=self.nv,
+                                              n_hidden=self.m,
+                                              max_iter=500,
+                                              anneal=True,
+                                              verbose=self.verbose)
+        lin_corex.fit(np.concatenate(x, axis=0))
+
+        x = [np.array(xt, dtype=np.float32) for xt in x]
+        dummy = self.preprocess(x, fit=True)  # Fit a transform for each marginal
+
+        # use the priors to estimate <X_i> and std(x_i) better
+        for t in range(self.nt):
+            cur_mean = (1 - self.lamb) * self.theta[t][0] + self.lamb * lin_corex.theta[0]
+            cur_std = (1 - self.lamb) * self.theta[t][1] + self.lamb * lin_corex.theta[1]
+            self.theta[t] = (cur_mean, cur_std)
+
+        x = self.preprocess(x, fit=False)  # standardize the data using the better estimates
+        self.x_std = x  # to have an access to standardized x
+
+        # initialize W matrices with lin_corex matrix
+        self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
+
+        # initialize priors
+        for t in range(self.nt):
+            self.z2_prior[t].set_value(lin_corex.moments['Y_j^2'].astype(np.float32))
+            self.R_prior[t].set_value(lin_corex.moments['rho'].astype(np.float32))
+
+        anneal_schedule = [0.]
+        if self.anneal:
+            anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
+
+        if self.pretrained_weights is not None:
+            for cur_w, pre_w in zip(self.ws, self.pretrained_weights):
+                cur_w.set_value(pre_w.astype(np.float32))
+
+        for i_eps, eps in enumerate(anneal_schedule):
+            start_time = time.time()
+
+            self.eps = eps
+            self.anneal_eps.set_value(np.float32(eps))
+            self.moments = self._calculate_moments(x, self.ws, quick=True)
+            self._update_u(x)
+
+            for i_loop in range(self.max_iter):
+                ret = self.train_step(*x)
+                obj = ret[0]
+                reg_obj = ret[2]
+
+                if i_loop % self.update_iter == 0 and self.verbose:
+                    self.moments = self._calculate_moments(x, self.ws, quick=True)
+                    self._update_u(x)
+                    print("tc = {}, obj = {}, reg = {}, eps = {}".format(np.sum(self.tc),
+                                                                         obj, reg_obj, eps))
+
+            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
+
+        self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
+        return self
+
+    def get_covariance(self):
+        norm_cov = self.get_norm_covariance(*list(np.array(self.x_std).astype(np.float32)))
+        ret = [None] * self.nt
+        for t in range(self.nt):
+            ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * norm_cov[t]
+        return ret
