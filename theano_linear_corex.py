@@ -1,3 +1,7 @@
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
@@ -144,7 +148,7 @@ class Corex:
                 if self.verbose and i_loop % 15 == 0:
                     self.moments = self._calculate_moments(x, self.ws, quick=True)
                     self._update_u(x)
-                    print "tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps)
+                    print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
 
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
@@ -235,7 +239,7 @@ class Corex:
         m["uj"] = (1 - self.eps ** 2) * tmp_sum / n_samples + self.eps ** 2 * np.sum(ws ** 2, axis=1)
 
         if np.max(m["uj"]) > 1.0:
-            print np.max(m["uj"])
+            print(np.max(m["uj"]))
             assert False
 
         if self.gpu:

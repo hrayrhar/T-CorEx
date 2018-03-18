@@ -6,6 +6,10 @@ We also constrain our solutions to be "non-synergistic" for better interpretabil
 Code below written by:
 Greg Ver Steeg (gregv@isi.edu), 2017.
 """
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
 import numpy as np
 import pandas as pd
 import cPickle as pkl
@@ -67,7 +71,7 @@ class Corex(object):
     def __init__(self, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  discourage_overlap=True, gaussianize='standard', gpu=False,
                  verbose=False, seed=None, optimizer=SGD(lr=1e-2), regularizer=L2Reg(0.0)):
-    
+
         self.m = n_hidden  # Number of latent factors to learn
         self.max_iter = max_iter  # Number of iterations to try
         self.tol = tol  # Threshold for convergence
@@ -76,7 +80,7 @@ class Corex(object):
         self.missing_values = missing_values
         self.optimizer = optimizer
         self.regularizer = regularizer
-        
+
         self.discourage_overlap = discourage_overlap  # Whether or not to discourage overlapping latent factors
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
         self.gpu = gpu  # Enable GPU support for some large matrix multiplications.
@@ -331,16 +335,16 @@ class Corex(object):
         tmp_dot = np.dot(self._sig(x, W), W.T)
         z2 = self.yscale**2 + np.einsum("ii->i", tmp_dot)
         return W / np.sqrt(z2).reshape((-1, 1))
-    
+
     def _update_ns(self, x):
         """Perform one update of the weights and re-calculate moments in the NON-SYNERGISTIC case."""
         m = self.moments
         w_updates = []
         m_updates = []
-        
+
         params = []
         grads = []
-        
+
         for t in range(self.nt):
             rj = 1. - m[t]["uj"][:, np.newaxis]
             H = np.dot(m[t]["rhoinvrho"] / (1 + m[t]["Qi"] - m[t]["Si"]**2), m[t]["rhoinvrho"].T)
@@ -350,7 +354,7 @@ class Corex(object):
             grad += m[t]["invrho"]**2 * \
                    ((1 + m[t]["rho"]**2) * m[t]["Qij"] - 2 * m[t]["rho"] * m[t]["Si"]) / (1 - m[t]["Si"]**2 + m[t]["Qi"])
             grad += np.dot(H, self.ws[t])
-            
+
             # make a better gradient estimate by multipying each row by sqrt(E[zj^2])
             """
             for j in range(self.ws[t].shape[0]):
@@ -360,11 +364,11 @@ class Corex(object):
             tmp_dot = np.dot(self._sig(x[t], self.ws[t]), self.ws[t].T)
             z2 = (self.yscale**2) / np.clip(1 - np.einsum("ii->i", tmp_dot), 1e-8, 1)
             grad *= np.sqrt(z2).reshape((-1, 1))
-            
+
             current_real_W = self.getW(self.ws[t], x[t])
             params.append(current_real_W)
             grads.append(grad)
-        
+
         # add regularization term gradient
         reg_grad = self.regularizer.get_gradient(params)
         for t in range(self.nt):
@@ -375,7 +379,7 @@ class Corex(object):
                         for t in range(self.nt)]
         m_updates = [self._calculate_moments_ns(x[t], w_updates[t], quick=True)
                         for t in range(self.nt)]
-        
+
         print("TC = {}, reg = {}, eps = {}".format(sum(self.tc),
                                                    self.regularizer.regularize(params_new),
                                                    self.eps))

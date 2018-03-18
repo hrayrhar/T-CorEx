@@ -1,10 +1,15 @@
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
 from generate_data import generate_nglf_from_matrix, generate_nglf_from_model, \
     generate_general_make_spd, generate_nglf_timeseries
 from misc_utils import make_sure_path_exists, make_buckets
 from sklearn.model_selection import train_test_split
 from theano_time_corex import TimeCorexSigma, TimeCorexW, TimeCorexGlobalMI, TimeCorexWWT
+from theano_time_corex import TimeCorexWPriorLearnable
 
-import cPickle
+import pickle
 import argparse
 import baselines
 import json
@@ -36,9 +41,9 @@ def main():
 
     ''' Load experiment data'''
     if args.load_experiment:
-        print "Loading previously saved data from {} ...".format(args.load_experiment)
+        print("Loading previously saved data from {} ...".format(args.load_experiment))
         with open(args.load_experiment, 'r') as f:
-            loaded_exp_data = cPickle.load(f)
+            loaded_exp_data = pickle.load(f)
             for k, v in loaded_exp_data.iteritems():
                 if k not in ['prefix', 'eval_iter']:
                     exp_data[k] = v
@@ -144,6 +149,21 @@ def main():
                                        'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                        'l2': [],
                                        'lambda': [0.0, 0.5, 0.9, 0.99]}, "Time-Varying Linear CorEx with Priors (W)"),
+
+        (baselines.TCorex(TimeCorexWPriorLearnable), {'nv': args.nv,
+                                                      'n_hidden': [args.m],
+                                                      'max_iter': 500,
+                                                      'anneal': True,
+                                                      'l1': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+                                                      'l2': []}, "Time-Varying Linear CorEx with priors (W, learnable)"),
+
+        (baselines.TimeCorexWPrior2(), {'nv': args.nv,
+                                        'n_hidden': [args.m],
+                                        'max_iter': 500,
+                                        'anneal': True,
+                                        'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                        'l2': [],
+                                        'lambda': [0.0, 0.5, 0.9, 0.99]}, "Time-Varying Linear CorEx with Priors (W, method 2)")
     ]
 
     results = {}
@@ -153,6 +173,7 @@ def main():
             best_params, best_score = method.select(args.train_data, args.val_data, params)
             results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
             results[name]['best_params'] = best_params
+            results[name]['best_val_score'] = best_score
         else:
             ''' Time-series '''
             results_per_window_and_stride = []
@@ -203,7 +224,7 @@ def main():
             results[name]['results_per_window_and_stride'] = results_per_window_and_stride
 
     ''' Save the data and results '''
-    print "Saving the data and parameters of the experiment ..."
+    print("Saving the data and parameters of the experiment ...")
     if args.snr:
         exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}'.format(
             args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt, args.snr)
@@ -216,16 +237,16 @@ def main():
         exp_name = args.prefix + '.' + exp_name
 
     results_path = "results/{}.results.json".format(exp_name)
-    print "Saving the results in {}".format(results_path)
+    print("Saving the results in {}".format(results_path))
     make_sure_path_exists(results_path)
     with open(results_path, 'w') as f:
         json.dump(results, f)
 
     data_path = "saved_data/{}.pkl".format(exp_name)
-    print "Saving data and params in {}".format(data_path)
+    print("Saving data and params in {}".format(data_path))
     make_sure_path_exists(data_path)
     with open(data_path, 'w') as f:
-        cPickle.dump(exp_data, f)
+        pickle.dump(exp_data, f)
 
 
 if __name__ == '__main__':

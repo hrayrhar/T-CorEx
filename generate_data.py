@@ -1,3 +1,7 @@
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
 from scipy.stats import multivariate_normal
 from sklearn.datasets import make_spd_matrix
 
@@ -34,10 +38,10 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
     if snr is None:
         cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
         snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
-        print "Average SNR: {}".format(snr)
+        print("Average SNR: {}".format(snr))
     else:
         cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
-        print "Fixed SNR: {}".format(snr)
+        print("Fixed SNR: {}".format(snr))
 
     # Construct the ground truth covariance matrix of x
     ground_truth = np.zeros((nv, nv))
@@ -165,10 +169,10 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
         if snr is None:
             cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
             snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
-            print "Average SNR: {}".format(snr)
+            print("Average SNR: {}".format(snr))
         else:
             cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
-            print "Fixed SNR: {}".format(snr)
+            print("Fixed SNR: {}".format(snr))
         return (x_std, cor)
 
     def construct_ground_truth(nv, x_std, cor):

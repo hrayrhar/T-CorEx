@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from scipy.stats import multivariate_normal
 import numpy as np
 

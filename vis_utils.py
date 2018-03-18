@@ -25,5 +25,5 @@ def plot_for_next_timestep(data, covs,title="Negative log-likelihood of estimate
     plt.ylabel("Negative log-likelihood")
     plt.xticks(range(1, nt))
     plt.show()
-    print "NLL for next time step = {}".format(np.mean(nll))
+    print("NLL for next time step = {}".format(np.mean(nll)))
     return np.mean(nll)
