@@ -148,14 +148,16 @@ def main():
                                        'anneal': True,
                                        'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                        'l2': [],
-                                       'lambda': [0.0, 0.5, 0.9, 0.99]}, "Time-Varying Linear CorEx with Priors (W)"),
+                                       'lambda': [0.0, 0.5, 0.9, 0.99]},
+         "Time-Varying Linear CorEx with Priors (W, method 1)"),
 
-        (baselines.TCorex(TimeCorexWPriorLearnable), {'nv': args.nv,
-                                                      'n_hidden': [args.m],
-                                                      'max_iter': 500,
-                                                      'anneal': True,
-                                                      'l1': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-                                                      'l2': []}, "Time-Varying Linear CorEx with priors (W, learnable)"),
+        # (baselines.TCorex(TimeCorexWPriorLearnable), {'nv': args.nv,
+        #                                               'n_hidden': [args.m],
+        #                                               'max_iter': 500,
+        #                                               'anneal': True,
+        #                                               'l1': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+        #                                               'l2': []},
+        #  "Time-Varying Linear CorEx with priors (W, method 1, learnable)"),
 
         (baselines.TimeCorexWPrior2(), {'nv': args.nv,
                                         'n_hidden': [args.m],
@@ -163,7 +165,8 @@ def main():
                                         'anneal': True,
                                         'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                         'l2': [],
-                                        'lambda': [0.0, 0.5, 0.9, 0.99]}, "Time-Varying Linear CorEx with Priors (W, method 2)")
+                                        'lambda': [0.0, 0.5, 0.9, 0.99]},
+         "Time-Varying Linear CorEx with Priors (W, method 2)")
     ]
 
     results = {}
@@ -242,11 +245,11 @@ def main():
     with open(results_path, 'w') as f:
         json.dump(results, f)
 
-    data_path = "saved_data/{}.pkl".format(exp_name)
-    print("Saving data and params in {}".format(data_path))
-    make_sure_path_exists(data_path)
-    with open(data_path, 'w') as f:
-        pickle.dump(exp_data, f)
+    # data_path = "saved_data/{}.pkl".format(exp_name)
+    # print("Saving data and params in {}".format(data_path))
+    # make_sure_path_exists(data_path)
+    # with open(data_path, 'w') as f:
+    #     pickle.dump(exp_data, f)
 
 
 if __name__ == '__main__':

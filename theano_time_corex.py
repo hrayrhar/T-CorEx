@@ -1165,7 +1165,7 @@ class TimeCorexWPrior2(TimeCorex):
         self.x_std = x  # to have an access to standardized x
 
         # initialize W matrices with lin_corex matrix
-        # self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt  # TODO: maybe this can be helpful ?
+        self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
 
         if self.pretrained_weights is not None:
             for cur_w, pre_w in zip(self.ws, self.pretrained_weights):
