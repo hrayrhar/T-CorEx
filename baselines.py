@@ -442,6 +442,120 @@ class TimeCorexWPrior2(Baseline):
         return self.report_scores(scores, n_iter)
 
 
+class TimeCorexWPriorWeights(Baseline):
+    def __init__(self):
+        super(TimeCorexWPriorWeights, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print("Selecting the best parameter values for {} ...".format(self.__class__.__name__))
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params) * len(params['lambda']) * len(params['gamma'])
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                for lamb in params['lambda']:
+                    for gamma in params['gamma']:
+                        print("done {} / {} | reg_c: {}, lamb: {}, gamma: {}".format(
+                            done, grid_size, reg_param[1], lamb, gamma))
+                        cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
+                                           'max_iter': params['max_iter'], 'anneal': True})
+                        cur_params['l1'] = 0
+                        cur_params['l2'] = 0
+                        cur_params[reg_param[0]] = reg_param[1]
+                        cur_params['lambda'] = lamb
+                        cur_params['gamma'] = gamma
+                        if best_params is None:
+                            best_params = cur_params  # just to select one valid set of parameters
+                        cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                        if not np.isnan(cur_score) and cur_score < best_score:
+                            best_score = cur_score
+                            best_params = cur_params
+                        done += 1
+        print("\n")
+        return (best_params, best_score)
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print("Evaluating {} for {} iterations ...".format(self.__class__.__name__, n_iter))
+        start_time = time.time()
+        scores = []
+        for iteration in range(n_iter):
+            c = theano_time_corex.TimeCorexWPriorWeights(nt=len(train_data),
+                                                         nv=params['nv'],
+                                                         n_hidden=params['n_hidden'],
+                                                         max_iter=params['max_iter'],
+                                                         anneal=params['anneal'],
+                                                         l1=params['l1'],
+                                                         l2=params['l2'],
+                                                         lamb=params['lambda'],
+                                                         gamma=params['gamma'])
+            c.fit(train_data)
+            covs = c.get_covariance()
+            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+            scores.append(cur_nll)
+        finish_time = time.time()
+        print("\tElapsed time {:.1f}s, mean score = {}".format(finish_time - start_time, np.mean(scores)))
+        return self.report_scores(scores, n_iter)
+
+
+class TimeCorexWPriorOnlyWeights(Baseline):
+    def __init__(self):
+        super(TimeCorexWPriorOnlyWeights, self).__init__()
+
+    def select(self, train_data, val_data, params):
+        print("Selecting the best parameter values for {} ...".format(self.__class__.__name__))
+        best_score = 1e18
+        best_params = None
+        reg_params = [('l1', x) for x in params['l1']]
+        reg_params += [('l2', x) for x in params['l2']]
+        grid_size = len(params['n_hidden']) * len(reg_params) * len(params['gamma'])
+        done = 0
+        for n_hidden in params['n_hidden']:
+            for reg_param in reg_params:
+                for gamma in params['gamma']:
+                    print("done {} / {} | reg_c: {}, gamma: {}".format(done, grid_size, reg_param[1], gamma))
+                    cur_params = dict({'nt': len(train_data), 'nv': params['nv'], 'n_hidden': n_hidden,
+                                       'max_iter': params['max_iter'], 'anneal': True})
+                    cur_params['l1'] = 0
+                    cur_params['l2'] = 0
+                    cur_params[reg_param[0]] = reg_param[1]
+                    cur_params['gamma'] = gamma
+                    if best_params is None:
+                        best_params = cur_params  # just to select one valid set of parameters
+                    cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
+                    if not np.isnan(cur_score) and cur_score < best_score:
+                        best_score = cur_score
+                        best_params = cur_params
+                    done += 1
+        print("\n")
+        return (best_params, best_score)
+
+    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+        if verbose:
+            print("Evaluating {} for {} iterations ...".format(self.__class__.__name__, n_iter))
+        start_time = time.time()
+        scores = []
+        for iteration in range(n_iter):
+            c = theano_time_corex.TimeCorexWPriorOnlyWeights(nt=len(train_data),
+                                                             nv=params['nv'],
+                                                             n_hidden=params['n_hidden'],
+                                                             max_iter=params['max_iter'],
+                                                             anneal=params['anneal'],
+                                                             l1=params['l1'],
+                                                             l2=params['l2'],
+                                                             gamma=params['gamma'])
+            c.fit(train_data)
+            covs = c.get_covariance()
+            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+            scores.append(cur_nll)
+        finish_time = time.time()
+        print("\tElapsed time {:.1f}s, mean score = {}".format(finish_time - start_time, np.mean(scores)))
+        return self.report_scores(scores, n_iter)
+
+
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self):
         super(TimeVaryingGraphLasso, self).__init__()
