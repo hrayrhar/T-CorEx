@@ -166,11 +166,32 @@ def main():
                                         'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                                         'l2': [],
                                         'lambda': [0.0, 0.5, 0.9, 0.99]},
-         "Time-Varying Linear CorEx with Priors (W, method 2)")
+         "Time-Varying Linear CorEx with Priors (W, method 2)"),
+
+        (baselines.TimeCorexWPriorWeights(), {'nv': args.nv,
+                                              'n_hidden': [args.m],
+                                              'max_iter': 500,
+                                              'anneal': True,
+                                              # 'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                              'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+                                              'l2': [],
+                                              'lambda': [0.0, 0.5, 0.9, 0.99],
+                                              'gamma': [1.25, 1.5, 2.0, 2.5, 1e5]},
+         "Time-Varying Linear CorEx with Priors (W, weights)"),
+
+        (baselines.TimeCorexWPriorOnlyWeights(), {'nv': args.nv,
+                                                  'n_hidden': [args.m],
+                                                  'max_iter': 500,
+                                                  'anneal': True,
+                                                  'l1': [0.000, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                                                  # 'l1': [0.1, 0.3, 1.0, 3.0, 10.0],
+                                                  'l2': [],
+                                                  'gamma': [1.25, 1.5, 2.0, 2.5, 1e5]},
+         "Time-Varying Linear CorEx with Priors (W, weights only)")
     ]
 
     results = {}
-    for (method, params, name) in methods[-1:]:
+    for (method, params, name) in methods[-2:-1]:
         if not is_time_series:
             ''' Buckets '''
             best_params, best_score = method.select(args.train_data, args.val_data, params)
