@@ -1556,6 +1556,7 @@ class TimeCorexWPriorOnlyWeights(TimeCorex):
 
         # initialize W matrices with lin_corex matrix
         self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
+        self.pretrained_weights = None  # TODO: remove
 
         if self.pretrained_weights is not None:
             for cur_w, pre_w in zip(self.ws, self.pretrained_weights):

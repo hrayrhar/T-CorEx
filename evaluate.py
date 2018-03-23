@@ -187,11 +187,11 @@ def main():
                                                   # 'l1': [0.1, 0.3, 1.0, 3.0, 10.0],
                                                   'l2': [],
                                                   'gamma': [1.25, 1.5, 2.0, 2.5, 1e5]},
-         "Time-Varying Linear CorEx with Priors (W, weights only)")
+         "Time-Varying Linear CorEx with Priors (W, weights only, no init)")
     ]
 
     results = {}
-    for (method, params, name) in methods[-2:-1]:
+    for (method, params, name) in methods[-1:]:
         if not is_time_series:
             ''' Buckets '''
             best_params, best_score = method.select(args.train_data, args.val_data, params)
