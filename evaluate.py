@@ -188,19 +188,19 @@ def main():
             'init': True
         }),
 
-        (baselines.TCorex(tcorex=TCorexPrior2Weights, name='T-Corex + priors (W, method 2, weighted samples)'), {
-            'nv': args.nv,
-            'n_hidden': [args.m],
-            'max_iter': 500,
-            'anneal': True,
-            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-            'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
-            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
-            'reg_type': 'W',
-            'init': True
-        }),
+        # (baselines.TCorex(tcorex=TCorexPrior2Weights, name='T-Corex + priors (W, method 2, weighted samples)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': [args.m],
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #     'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+        #     'l2': [],
+        #     'lamb': [0.0, 0.5, 0.9, 0.99],
+        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'reg_type': 'W',
+        #     'init': True
+        # }),
 
         (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
             'nv': args.nv,
@@ -208,9 +208,8 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
             'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
             'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
             'reg_type': 'W',
             'init': True
@@ -222,9 +221,8 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
             'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
             'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
             'reg_type': 'W',
             'init': False
@@ -232,7 +230,7 @@ def main():
     ]
 
     results = {}
-    for (method, params) in methods[-1:]:
+    for (method, params) in methods[:]:
         name = method.name
         if not is_time_series:
             ''' Buckets '''
