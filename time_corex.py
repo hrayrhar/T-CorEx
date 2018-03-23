@@ -517,7 +517,7 @@ class Corex(object):
                 np.fill_diagonal(cov, 1)
                 ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
             else:
-                cov = np.einsum('ij,kj->ik', m[t]["X_i Z_j"], mp[t]["X_i Y_j"])
+                cov = np.einsum('ij,kj->ik', m[t]["X_i Z_j"], m[t]["X_i Y_j"])
                 np.fill_diagonal(cov, 1)
                 ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
         return ret

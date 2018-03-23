@@ -6,8 +6,7 @@ from generate_data import generate_nglf_from_matrix, generate_nglf_from_model, \
     generate_general_make_spd, generate_nglf_timeseries
 from misc_utils import make_sure_path_exists, make_buckets
 from sklearn.model_selection import train_test_split
-from theano_time_corex import TimeCorexSigma, TimeCorexW, TimeCorexGlobalMI, TimeCorexWWT
-from theano_time_corex import TimeCorexWPriorLearnable
+from theano_time_corex import *
 
 import pickle
 import argparse
@@ -84,114 +83,157 @@ def main():
 
     ''' Define baselines and the grid of parameters '''
     methods = [
-        (baselines.GroundTruth(covs=args.ground_truth_covs, test_data=args.test_data), {}, "Ground Truth"),
+        (baselines.GroundTruth(name='Ground Truth',
+                               covs=args.ground_truth_covs,
+                               test_data=args.test_data), {}),
 
-        (baselines.Diagonal(), {}, "Diagonal"),
+        (baselines.Diagonal(name='Diagonal'), {}),
 
-        (baselines.LedoitWolf(), {}, "Ledoit-Wolf"),
+        (baselines.LedoitWolf(name='Ledoit-Wolf'), {}),
 
-        (baselines.OAS(), {}, "Oracle approximating shrinkage"),
+        (baselines.OAS(name='Oracle approximating shrinkage'), {}),
 
-        (baselines.PCA(), {'n_components': [args.m]}, "PCA"),
+        (baselines.PCA(name='PCA'), {'n_components': [args.m]}),
 
-        (baselines.FactorAnalysis(), {'n_components': [args.m]}, "Factor Analysis"),
+        (baselines.FactorAnalysis(name='Factor Analysis'), {'n_components': [args.m]}),
 
-        (baselines.GraphLasso(), {'alpha': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
-                                  'mode': 'lars',
-                                  'max_iter': 100}, "Graphical LASSO"),
+        (baselines.GraphLasso(name='Graphical LASSO (sklearn)'), {
+            'alpha': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
+            'mode': 'lars',
+            'max_iter': 100}),
 
-        (baselines.LinearCorex(), {'n_hidden': [args.m],
-                                   'max_iter': 500,
-                                   'anneal': True}, "Linear CorEx"),
+        (baselines.LinearCorex(name='Linear CorEx (applied bucket-wise)'), {
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True}),
 
-        (baselines.TCorex(TimeCorexSigma), {'nv': args.nv,
-                                            'n_hidden': [args.m],
-                                            'max_iter': 500,
-                                            'anneal': True,
-                                            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                            'l2': []}, "Time-Varying Linear CorEx (Sigma)"),
+        (baselines.LinearCorexWholeData(name='Linear CorEx (applied on whole data)'), {
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True}),
 
-        (baselines.TCorex(TimeCorexW), {'nv': args.nv,
-                                        'n_hidden': [args.m],
-                                        'max_iter': 500,
-                                        'anneal': True,
-                                        'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                        'l2': []}, "Time-Varying Linear CorEx (W)"),
+        (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
+            'lamb': [0.01, 0.03, 0.1, 0.3],
+            'beta': [0.03, 0.1, 0.3, 1.0],
+            'indexOfPenalty': [1],  # TODO: extend grid of this one
+            'max_iter': 30}),
 
-        # (baselines.TCorex(TimeCorexGlobalMI), {'nv': args.nv,
-        #                                        'n_hidden': [args.m],
-        #                                        'max_iter': 500,
-        #                                        'anneal': True,
-        #                                        'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #                                        'l2': []}, "Time-Varying Linear CorEx (MI)"),
+        (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
+            'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
+            'beta': [0.0],
+            'indexOfPenalty': [1],
+            'max_iter': 30}),
 
-        (baselines.TCorex(TimeCorexWWT), {'nv': args.nv,
-                                          'n_hidden': [args.m],
-                                          'max_iter': 500,
-                                          'anneal': True,
-                                          'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                          'l2': []}, "Time-Varying Linear CorEx (WWT)"),
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
+            'nv': args.nv,
+            'n_hidden': args.m,
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'reg_type': 'Sigma'
+        }),
 
-        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.01, 0.03, 0.1, 0.3],
-                                             'beta': [0.03, 0.1, 0.3, 1.0],
-                                             'indexOfPenalty': [1],  # TODO: extend grid of this one
-                                             'max_iter': 30}, "Time-Varying GLASSO"),
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
+            'nv': args.nv,
+            'n_hidden': args.m,
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'reg_type': 'W'
+        }),
 
-        (baselines.TimeVaryingGraphLasso(), {'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
-                                             'beta': [0.0],
-                                             'indexOfPenalty': [1],
-                                             'max_iter': 30}, "Time-Varying GLASSO (no reg)"),
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (MI)'), {
+            'nv': args.nv,
+            'n_hidden': args.m,
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'reg_type': 'MI'
+        }),
 
-        (baselines.TimeCorexWPrior(), {'nv': args.nv,
-                                       'n_hidden': [args.m],
-                                       'max_iter': 500,
-                                       'anneal': True,
-                                       'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                       'l2': [],
-                                       'lambda': [0.0, 0.5, 0.9, 0.99]},
-         "Time-Varying Linear CorEx with Priors (W, method 1)"),
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (WWT)'), {
+            'nv': args.nv,
+            'n_hidden': args.m,
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'reg_type': 'WWT'
+        }),
 
-        # (baselines.TCorex(TimeCorexWPriorLearnable), {'nv': args.nv,
-        #                                               'n_hidden': [args.m],
-        #                                               'max_iter': 500,
-        #                                               'anneal': True,
-        #                                               'l1': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #                                               'l2': []},
-        #  "Time-Varying Linear CorEx with priors (W, method 1, learnable)"),
+        (baselines.TCorex(tcorex=TCorexPrior1, name='T-Corex + priors (W, method 1)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'lamb': [0.0, 0.5, 0.9, 0.99],
+            'reg_type': 'W',
+            'init': True
+        }),
 
-        (baselines.TimeCorexWPrior2(), {'nv': args.nv,
-                                        'n_hidden': [args.m],
-                                        'max_iter': 500,
-                                        'anneal': True,
-                                        'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                        'l2': [],
-                                        'lambda': [0.0, 0.5, 0.9, 0.99]},
-         "Time-Varying Linear CorEx with Priors (W, method 2)"),
+        (baselines.TCorex(tcorex=TCorexPrior2, name='T-Corex + priors (W, method 2)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l2': [],
+            'lamb': [0.0, 0.5, 0.9, 0.99],
+            'reg_type': 'W',
+            'init': True
+        }),
 
-        (baselines.TimeCorexWPriorWeights(), {'nv': args.nv,
-                                              'n_hidden': [args.m],
-                                              'max_iter': 500,
-                                              'anneal': True,
-                                              # 'l1': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                              'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-                                              'l2': [],
-                                              'lambda': [0.0, 0.5, 0.9, 0.99],
-                                              'gamma': [1.25, 1.5, 2.0, 2.5, 1e5]},
-         "Time-Varying Linear CorEx with Priors (W, weights)"),
+        (baselines.TCorex(tcorex=TCorexPrior2Weights, name='T-Corex + priors (W, method 2, weighted samples)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l2': [],
+            'lamb': [0.0, 0.5, 0.9, 0.99],
+            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'reg_type': 'W',
+            'init': True
+        }),
 
-        (baselines.TimeCorexWPriorOnlyWeights(), {'nv': args.nv,
-                                                  'n_hidden': [args.m],
-                                                  'max_iter': 500,
-                                                  'anneal': True,
-                                                  'l1': [0.000, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                                                  # 'l1': [0.1, 0.3, 1.0, 3.0, 10.0],
-                                                  'l2': [],
-                                                  'gamma': [1.25, 1.5, 2.0, 2.5, 1e5]},
-         "Time-Varying Linear CorEx with Priors (W, weights only, no init)")
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l2': [],
+            'lamb': [0.0, 0.5, 0.9, 0.99],
+            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'reg_type': 'W',
+            'init': True
+        }),
+
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l2': [],
+            'lamb': [0.0, 0.5, 0.9, 0.99],
+            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'reg_type': 'W',
+            'init': False
+        })
     ]
 
     results = {}
-    for (method, params, name) in methods[-1:]:
+    for (method, params) in methods[-1:]:
+        name = method.name
         if not is_time_series:
             ''' Buckets '''
             best_params, best_score = method.select(args.train_data, args.val_data, params)
