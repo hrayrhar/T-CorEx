@@ -123,15 +123,15 @@ def main():
             'indexOfPenalty': [1],
             'max_iter': 30}),
 
-        (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
-            'nv': args.nv,
-            'n_hidden': args.m,
-            'max_iter': 500,
-            'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l2': [],
-            'reg_type': 'Sigma'
-        }),
+        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': args.m,
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #     'l2': [],
+        #     'reg_type': 'Sigma'
+        # }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
             'nv': args.nv,
@@ -143,25 +143,25 @@ def main():
             'reg_type': 'W'
         }),
 
-        (baselines.TCorex(tcorex=TCorex, name='T-Corex (MI)'), {
-            'nv': args.nv,
-            'n_hidden': args.m,
-            'max_iter': 500,
-            'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l2': [],
-            'reg_type': 'MI'
-        }),
+        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (MI)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': args.m,
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #     'l2': [],
+        #     'reg_type': 'MI'
+        # }),
 
-        (baselines.TCorex(tcorex=TCorex, name='T-Corex (WWT)'), {
-            'nv': args.nv,
-            'n_hidden': args.m,
-            'max_iter': 500,
-            'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l2': [],
-            'reg_type': 'WWT'
-        }),
+        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (WWT)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': args.m,
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #     'l2': [],
+        #     'reg_type': 'WWT'
+        # }),
 
         (baselines.TCorex(tcorex=TCorexPrior1, name='T-Corex + priors (W, method 1)'), {
             'nv': args.nv,
@@ -214,18 +214,18 @@ def main():
             'init': True
         }),
 
-        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
-            'nv': args.nv,
-            'n_hidden': [args.m],
-            'max_iter': 500,
-            'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-            'l2': [],
-            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
-            'reg_type': 'W',
-            'init': False
-        })
+        # (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': [args.m],
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #     # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+        #     'l2': [],
+        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'reg_type': 'W',
+        #     'init': False
+        # })
     ]
 
     results = {}
