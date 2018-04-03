@@ -42,7 +42,7 @@ def main():
         print("Loading previously saved data from {} ...".format(args.load_experiment))
         with open(args.load_experiment, 'r') as f:
             loaded_exp_data = pickle.load(f)
-            for k, v in loaded_exp_data.iteritems():
+            for k, v in loaded_exp_data.items():
                 if k not in ['prefix', 'eval_iter']:
                     exp_data[k] = v
     else:
@@ -138,7 +138,8 @@ def main():
             'n_hidden': args.m,
             'max_iter': 500,
             'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0, 0.001, 0.003],
             'l2': [],
             'reg_type': 'W'
         }),
@@ -168,9 +169,11 @@ def main():
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0, 0.03, 0.1, 0.3, 1.0],
             'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
+            # 'lamb': [0.0, 0.5, 0.9, 0.99],
+            'lamb': [0.0],
             'reg_type': 'W',
             'init': True
         }),
@@ -180,9 +183,11 @@ def main():
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0, 0.03, 0.1, 0.3, 1.0],
             'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
+            # 'lamb': [0.0, 0.5, 0.9, 0.99],
+            'lamb': [0.0],
             'reg_type': 'W',
             'init': True
         }),
@@ -193,10 +198,12 @@ def main():
             'max_iter': 500,
             'anneal': True,
             # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
             'l2': [],
-            'lamb': [0.0, 0.5, 0.9, 0.99],
-            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            # 'lamb': [0.0, 0.5, 0.9, 0.99],
+            'lamb': [0.5],
+            # 'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'gamma': [1e5],
             'reg_type': 'W',
             'init': True
         }),
@@ -206,30 +213,45 @@ def main():
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
             'l2': [],
-            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            # 'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'gamma': [1e5],
             'reg_type': 'W',
             'init': True
         }),
 
-        # (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #     'l2': [],
-        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
-        #     'reg_type': 'W',
-        #     'init': False
-        # })
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l2': [],
+            # 'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'gamma': [1e5],
+            'reg_type': 'W',
+            'init': False
+        }),
+
+        (baselines.TCorex(tcorex=TCorexWeightedObjective, name='T-Corex (W, weighted objective)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'l2': [],
+            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'reg_type': 'W',
+            'init': True
+        })
     ]
 
     results = {}
-    for (method, params) in methods[:]:
+    for (method, params) in methods[-1:]:
         name = method.name
         if not is_time_series:
             ''' Buckets '''

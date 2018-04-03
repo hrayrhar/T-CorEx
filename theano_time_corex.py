@@ -1074,3 +1074,110 @@ class TCorexWeights(TCorexBase):
             self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
 
         return self._train_loop(x)
+
+
+class TCorexWeightedObjective(TCorexWeights):
+    def __init__(self, **kwargs):
+        """
+        :param gamma: parameter that controls the decay of weights.
+                      weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
+                      If gamma is equal to 1 all samples will be used with weight 1.
+        """
+        super(TCorexWeightedObjective, self).__init__(**kwargs)
+        self._define_model()
+
+    def _define_model(self):
+        self.x_wno = [None] * self.nt
+        self.x = [None] * self.nt
+        self.ws = [None] * self.nt
+        self.anneal_eps = theano.shared(np.float32(0))
+
+        for t in range(self.nt):
+            self.x_wno[t] = T.matrix('X')
+            ns = self.x_wno[t].shape[0]
+            anneal_noise = self.rng.normal(size=(ns, self.nv))
+            self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
+            self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
+
+        epsilon = 1e-5
+        self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
+        mi_xz = [None] * self.nt
+
+        x_all = T.concatenate(self.x, axis=0)
+        ns_tot = x_all.shape[0]
+
+        for t in range(self.nt):
+            weights = []
+            for i in range(self.nt):
+                cur_ns = self.x_wno[i].shape[0]
+                weights.append(T.ones((cur_ns,)) / np.power(self.gamma, np.abs(i - t)))
+            weights = T.concatenate(weights, axis=0)
+            weights = weights / T.sum(weights)
+            weights = weights.reshape((-1, 1))
+
+            z_mean = T.dot(x_all, self.ws[t].T)
+            z_noise = self.rng.normal(avg=0.0, std=self.y_scale, size=(ns_tot, self.m))
+            z = z_mean + z_noise
+            z2 = ((z ** 2) * weights).sum(axis=0)  # (m,)
+            R = T.dot((z * weights).T, x_all)  # m, nv
+            R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+
+            if self.reg_type == 'MI':
+                mi_xz[t] = -0.5 * T.log1p(-T.clip(R ** 2, 0, 1 - epsilon))
+
+            # the rest depends on R and z2 only
+            ri = ((R ** 2) / T.clip(1 - R ** 2, epsilon, 1 - epsilon)).sum(axis=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
+                (1, self.m, self.nv))
+            inner_term_2 = z.reshape((ns_tot, self.m, 1))
+            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns_tot, nv)
+
+            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
+            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+
+            # objective
+            obj_part_1 = 0.5 * T.log(T.clip((((x_all - cond_mean) ** 2) * weights).mean(axis=0), epsilon, np.inf)).sum(axis=0)
+            obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        self.main_obj = T.sum(self.objs)
+
+        # regularization
+        reg_matrices = [None] * self.nt
+        if self.reg_type == 'W':
+            reg_matrices = self.ws
+        if self.reg_type == 'WWT':
+            for t in range(self.nt):
+                reg_matrices[t] = T.dot(self.ws[t].T, self.ws[t])
+        if self.reg_type == 'Sigma':
+            reg_matrices = self.sigma
+        if self.reg_type == 'MI':
+            reg_matrices = mi_xz
+
+        self.reg_obj = T.constant(0)
+
+        if self.l1 > 0:
+            l1_reg = T.sum([T.abs_(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = T.sum([T.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        self.total_obj = self.main_obj + self.reg_obj
+
+        # optimizer
+        updates = lasagne.updates.adam(self.total_obj, self.ws)
+
+        # functions
+        self.train_step = theano.function(inputs=self.x_wno,
+                                          outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
+                                          updates=updates)
+
+        self.get_norm_covariance = theano.function(inputs=self.x_wno,
+                                                   outputs=self.sigma)
