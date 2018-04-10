@@ -457,6 +457,5 @@ class TCorex(Baseline):
         c = self.tcorex(**params)
         start_time = time.time()
         c.fit(train_data)
-        covs = c.get_covariance()
         finish_time = time.time()
         return finish_time - start_time
