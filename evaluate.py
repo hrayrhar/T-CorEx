@@ -115,13 +115,13 @@ def main():
             'lamb': [0.01, 0.03, 0.1, 0.3],
             'beta': [0.03, 0.1, 0.3, 1.0],
             'indexOfPenalty': [1],  # TODO: extend grid of this one
-            'max_iter': 30}),
+            'max_iter': 100}),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
             'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
             'beta': [0.0],
             'indexOfPenalty': [1],
-            'max_iter': 30}),
+            'max_iter': 100}),
 
         # (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
         #     'nv': args.nv,
@@ -251,7 +251,7 @@ def main():
     ]
 
     results = {}
-    for (method, params) in methods[-1:]:
+    for (method, params) in methods[:]:
         name = method.name
         if not is_time_series:
             ''' Buckets '''
