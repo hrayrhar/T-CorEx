@@ -7,7 +7,14 @@ from sklearn.datasets import make_spd_matrix
 
 import numpy as np
 np.random.seed(42)
+
+import random
+random.seed(42)
+
+import pandas as pd
 import sklearn.covariance as skcov
+
+import pickle as pkl
 
 
 def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
@@ -140,7 +147,7 @@ def generate_general_make_spd(nv, m, nt, ns, normalize=False):
              for t in range(nt)], sigma)
 
 
-def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
+def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
     """ Generates data according to an NGLF model.
 
     :param nv:      Number of observed variables
@@ -193,8 +200,7 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
     (x_std_2, cor_2) = generate_sufficient_params(nv, m, snr, min_cor, min_var, max_var)
 
     ground_truth = []
-    ts_data = np.zeros((nt, nv))
-    test_data = np.zeros((nt, ns, nv))
+    data = np.zeros((nt, ns, nv))
 
     alphas = np.linspace(0, 1.0, nt)
     for i, alpha in enumerate(alphas):
@@ -203,7 +209,57 @@ def generate_nglf_timeseries(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
         sigma = construct_ground_truth(nv, x_std, cor)
         ground_truth.append(sigma)
         myu = np.zeros((nv,))
-        ts_data[i, :] = np.random.multivariate_normal(myu, sigma)
-        test_data[i, :] = np.random.multivariate_normal(myu, sigma, size=(ns,))
+        data[i, :] = np.random.multivariate_normal(myu, sigma, size=(ns,))
 
-    return (ts_data, test_data, ground_truth)
+    return (data, ground_truth)
+
+
+def load_stock_data(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
+                    start_date='2010-01-01', end_date='2011-01-01', stride='one'):
+    print("Loading stock data ...")
+    if data_type == 'stock_week':
+        with open('../data/EOD_week.pkl', 'rb') as f:
+            df = pd.DataFrame(pkl.load(f))
+    elif data_type == 'stock_day':
+        with open('../data/EOD_day.pkl', 'rb') as f:
+            df = pd.DataFrame(pkl.load(f))
+    else:
+        raise ValueError("Unrecognized value '{}' for data_type variable".format(data_type))
+    df = df[df.index >= start_date]
+    df = df[df.index <= end_date]
+    # df = df[['AAPL', 'MSFT', 'AMZN', 'INTC', 'BA', 'FDX']]
+    # df = df.loc[:, list(np.max(np.array(df), axis=0)<1)]
+
+    cols = list(df.columns)
+    random.shuffle(cols)
+    df = df[cols[:nv]]
+
+    train_data = []
+    val_data = []
+    test_data = []
+
+    window = train_cnt + val_cnt + test_cnt
+
+    if stride == 'one':
+        indices = range(window, len(df) - window)
+    if stride == 'full':
+        indices = range(window, len(df)-window, window+1)
+
+    for i in indices:
+        start = i - window
+        end = i + window + 1
+        perm = range(2 * window + 1)
+        random.shuffle(perm)
+
+        part = np.array(df[start:end])
+        assert len(part) == 2*window + 1
+
+        train_data.append(part[perm[:train_cnt]])
+        val_data.append(part[perm[train_cnt:train_cnt+val_cnt]])
+        test_data.append(part[perm[-test_cnt:]])
+
+    print('train shape:', np.array(train_data).shape)
+    print('val   shape:', np.array(val_data).shape)
+    print('test  shape:', np.array(test_data).shape)
+
+    return train_data, val_data, test_data
