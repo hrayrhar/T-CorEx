@@ -42,6 +42,16 @@ def main():
     args.test_data = [x[-args.test_cnt:] for x in data]
 
     ''' Define baselines and the grid of parameters '''
+    if args.train_cnt < 32:
+        tcorex_gamma_range = [1.25, 1.5, 2.0, 2.5, 1e5]
+    elif args.train_cnt < 64:
+        tcorex_gamma_range = [1.5, 2.0, 2.5, 1e5]
+    elif args.train_cnt < 128:
+        tcorex_gamma_range = [2.0, 2.5, 1e5]
+    else:
+        tcorex_gamma_range = [2.5, 1e5]
+
+
     methods = [
         (baselines.GroundTruth(name='Ground Truth',
                                covs=args.ground_truth_covs,
@@ -72,58 +82,28 @@ def main():
             'max_iter': 500,
             'anneal': True}),
 
-        (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
+        (baselines.TimeVaryingGraphLasso(name='T-GLASSO (L1)'), {
             'lamb': [0.01, 0.03, 0.1, 0.3],
-            'beta': [0.03, 0.1, 0.3, 1.0],
-            'indexOfPenalty': [2],  # TODO: extend grid of this one
-            'max_iter': 10}),  # NOTE: was 100
+            'beta': [0.03, 0.1, 0.3, 1.0, 3.0],
+            'indexOfPenalty': [1],
+            'max_iter': 100}),
 
-        (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
-            'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
-            'beta': [0.0],
-            'indexOfPenalty': [2],
-            'max_iter': 10}),  # NOTE: was 100
+        # (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
+        #     'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
+        #     'beta': [0.0],
+        #     'indexOfPenalty': [2],
+        #     'max_iter': 10}),  # NOTE: was 100
 
-        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': args.m,
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     'l1': [],
-        #     'reg_type': 'Sigma'
-        # }),
-
-        (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (W, L1)'), {
             'nv': args.nv,
             'n_hidden': args.m,
             'max_iter': 500,
             'anneal': True,
-            'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             # 'l2': [0, 0.001, 0.003],
-            'l1': [],
+            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'reg_type': 'W'
         }),
-
-        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (MI)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': args.m,
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     'l1': [],
-        #     'reg_type': 'MI'
-        # }),
-
-        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (WWT)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': args.m,
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     'l1': [],
-        #     'reg_type': 'WWT'
-        # }),
 
         # (baselines.TCorex(tcorex=TCorexPrior1, name='T-Corex + priors (W, method 1)'), {
         #     'nv': args.nv,
@@ -160,20 +140,19 @@ def main():
         #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
         #     'l1': [],
         #     'lamb': [0.0, 0.5, 0.9, 0.99],
-        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': True
         # }),
 
-        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, L1, weighted samples)'), {
             'nv': args.nv,
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
-            'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-            'l1': [],
-            'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+            'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True
         }),
@@ -186,7 +165,7 @@ def main():
         #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
         #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
         #     'l1': [],
-        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': False
         # }),
@@ -199,7 +178,7 @@ def main():
         #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
         #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
         #     'l1': [],
-        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': True
         # }),
@@ -213,7 +192,7 @@ def main():
         #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
         #     # 'l2': [1.0, 3.0, 10.0, 30.0, 100.0],
         #     'l1': [],
-        #     'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
+        #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': True,
         #     'sample_cnt': 256
@@ -231,7 +210,7 @@ def main():
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[:]:
+    for (method, params) in methods[-3:]:
         name = method.name
         best_params, best_score = method.select(args.train_data, args.val_data, params)
         results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
