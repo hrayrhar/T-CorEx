@@ -258,8 +258,9 @@ def load_stock_data(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
         val_data.append(part[perm[train_cnt:train_cnt+val_cnt]])
         test_data.append(part[perm[-test_cnt:]])
 
-    print('train shape:', np.array(train_data).shape)
-    print('val   shape:', np.array(val_data).shape)
-    print('test  shape:', np.array(test_data).shape)
+    print('Stock data is loaded:')
+    print('\ttrain shape:', np.array(train_data).shape)
+    print('\tval   shape:', np.array(val_data).shape)
+    print('\ttest  shape:', np.array(test_data).shape)
 
     return train_data, val_data, test_data

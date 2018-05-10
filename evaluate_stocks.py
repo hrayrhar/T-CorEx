@@ -29,16 +29,52 @@ def main():
 
     args.train_data, args.val_data, args.test_data = load_stock_data(
         nv=args.nv, train_cnt=args.train_cnt, val_cnt=args.val_cnt, test_cnt=args.test_cnt,
-        data_type=args.data_type, stride='full')
-    args.ground_truth_covs = None
+        data_type=args.data_type, stride='full',
+        start_date='2000-01-01', end_date='2018-01-01')
+
+    args.train_data = args.train_data[-args.nt:]
+    args.val_data = args.val_data[-args.nt:]
+    args.test_data = args.test_data[-args.nt:]
     args.nt = len(args.train_data)
 
+    print('train shape:', np.array(args.train_data).shape)
+    print('val   shape:', np.array(args.val_data).shape)
+    print('test  shape:', np.array(args.test_data).shape)
+
     ''' Define baselines and the grid of parameters '''
+    nhidden_grid = [8, 16, 32]
+    tcorex_gamma_grid = [1.25, 1.5, 2.0, 3.0, 4.0]
+
     methods = [
+        (baselines.Diagonal(name='Diagonal'), {}),
+
+        (baselines.LedoitWolf(name='Ledoit-Wolf'), {}),
+
+        (baselines.OAS(name='Oracle approximating shrinkage'), {}),
+
+        (baselines.PCA(name='PCA'), {'n_components': nhidden_grid}),
+
+        (baselines.FactorAnalysis(name='Factor Analysis'), {'n_components': nhidden_grid}),
+
+        (baselines.LinearCorex(name='Linear CorEx (applied bucket-wise)'), {
+            'n_hidden': nhidden_grid,
+            'max_iter': 500,
+            'anneal': True}),
+
+        (baselines.LinearCorexWholeData(name='Linear CorEx (applied on whole data)'), {
+            'n_hidden': nhidden_grid,
+            'max_iter': 500,
+            'anneal': True}),
+
+        (baselines.GraphLasso(name='Graphical LASSO (sklearn)'), {
+            'alpha': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
+            'mode': 'lars',
+            'max_iter': 100}),
+
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
             'lamb': [0.01, 0.03, 0.1, 0.3],
             'beta': [0.03, 0.1, 0.3, 1.0],
-            'indexOfPenalty': [1],  # TODO: extend grid of this one
+            'indexOfPenalty': [1],  # TODO: extend grid of this one; NOTE: L2 is slow and not efficient
             'max_iter': 100}),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
@@ -47,15 +83,37 @@ def main():
             'indexOfPenalty': [1],
             'max_iter': 100}),
 
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
+            'nv': args.nv,
+            'n_hidden': args.m,
+            'max_iter': 500,
+            'anneal': True,
+            'l2': [],
+            'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+            'reg_type': 'W'
+        }),
+
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no reg)'), {
+            'nv': args.nv,
+            'n_hidden': nhidden_grid,
+            'max_iter': 500,
+            'anneal': True,
+            'l1': [0.0],
+            'l2': 0.0,
+            'gamma': tcorex_gamma_grid,
+            'reg_type': 'W',
+            'init': True
+        }),
+
         (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
             'nv': args.nv,
-            'n_hidden': [8, 16, 32],
+            'n_hidden': nhidden_grid,
             'max_iter': 500,
             'anneal': True,
             # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
             'l2': [],
-            'gamma': [1.0, 1.25, 1.5, 2.0, 2.5],
+            'gamma': tcorex_gamma_grid,
             'reg_type': 'W',
             'init': True
         })
