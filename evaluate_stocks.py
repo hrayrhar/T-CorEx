@@ -1,5 +1,6 @@
 from __future__ import division
 from __future__ import absolute_import
+from __future__ import print_function
 
 from generate_data import *
 from misc_utils import make_sure_path_exists, make_buckets
@@ -121,7 +122,7 @@ def main():
 
     exp_name = '{}.m{}.train_cnt{}.val_cnt{}.test_cnt{}'.format(args.data_type, args.m, args.train_cnt,
                                                                 args.val_cnt, args.test_cnt)
-    exp_name = args.prefix + '.' + exp_name
+    exp_name = args.prefix + exp_name
     results_path = "results/{}.results.json".format(exp_name)
     make_sure_path_exists(results_path)
 
