@@ -26,7 +26,6 @@ def main():
     parser.add_argument('--max_cor', type=float, default=1.0, help='minimum correlation between a child and parent')
     parser.add_argument('--min_var', type=float, default=1.0, help='minimum x-variance')
     parser.add_argument('--max_var', type=float, default=1.0, help='maximum x-variance')
-    parser.add_argument('--eval_iter', type=int, default=1, help='number of evaluation iterations')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
     parser.add_argument('--data_type', dest='data_type', action='store', default='syn_nglf_buckets_smooth',
                         choices=['syn_nglf_buckets_smooth'], help='which dataset to load/create')
@@ -100,9 +99,11 @@ def main():
             'n_hidden': args.m,
             'max_iter': 500,
             'anneal': True,
-            # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l2': [0, 0.001, 0.003],
-            'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'reg_params': {
+                'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l2': [0, 0.001, 0.003],
+            },
             'reg_type': 'W'
         }),
 
@@ -111,9 +112,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l2': [0, 0.03, 0.1, 0.3, 1.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'lamb': [0.0, 0.5, 0.9, 0.99],
         #     'reg_type': 'W',
         #     'init': True
@@ -124,9 +127,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     'l2': [0, 0.03, 0.1, 0.3, 1.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'lamb': [0.0, 0.5, 0.9, 0.99],
         #     'reg_type': 'W',
         #     'init': True
@@ -137,9 +142,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'lamb': [0.0, 0.5, 0.9, 0.99],
         #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
@@ -151,8 +158,11 @@ def main():
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
-            'l1': [0, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+            'reg_params': {
+                'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l2': [0, 0.001, 0.003],
+            },
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True
@@ -163,9 +173,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': False
@@ -176,9 +188,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': True
@@ -189,10 +203,11 @@ def main():
         #     'n_hidden': [args.m],
         #     'max_iter': 500,
         #     'anneal': True,
-        #     'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #     # 'l2': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #     # 'l2': [1.0, 3.0, 10.0, 30.0, 100.0],
-        #     'l1': [],
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
         #     'gamma': tcorex_gamma_range,
         #     'reg_type': 'W',
         #     'init': True,
@@ -213,8 +228,9 @@ def main():
     results = {}
     for (method, params) in methods[-3:]:
         name = method.name
-        best_params, best_score = method.select(args.train_data, args.val_data, params)
-        results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
+        best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
+        results[name] = {}
+        results[name]['test_score'] = method.evaluate(args.test_data, best_params)
         results[name]['best_params'] = best_params
         results[name]['best_val_score'] = best_score
 

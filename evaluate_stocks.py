@@ -21,7 +21,6 @@ def main():
     parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
     parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')
-    parser.add_argument('--eval_iter', type=int, default=1, help='number of evaluation iterations')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
     parser.add_argument('--data_type', dest='data_type', action='store', default='syn_nglf_buckets',
                         choices=['stock_day', 'stock_week'],
@@ -86,11 +85,13 @@ def main():
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
             'nv': args.nv,
-            'n_hidden': args.m,
+            'n_hidden': nhidden_grid,
             'max_iter': 500,
             'anneal': True,
-            'l2': [],
-            'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+            'reg_params': {
+                'l2': [],
+                'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+            },
             'reg_type': 'W'
         }),
 
@@ -111,9 +112,11 @@ def main():
             'n_hidden': nhidden_grid,
             'max_iter': 500,
             'anneal': True,
-            # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
-            'l2': [],
+            'reg_params': {
+                # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+                'l2': [],
+            },
             'gamma': tcorex_gamma_grid,
             'reg_type': 'W',
             'init': True
@@ -127,10 +130,11 @@ def main():
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[:]:
+    for (method, params) in methods[-1:]:
         name = method.name
-        best_params, best_score = method.select(args.train_data, args.val_data, params)
-        results[name] = method.evaluate(args.train_data, args.test_data, best_params, args.eval_iter)
+        best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
+        results[name] = {}
+        results[name]['test_score'] = method.evaluate(args.test_data, best_params)
         results[name]['best_params'] = best_params
         results[name]['best_val_score'] = best_score
 

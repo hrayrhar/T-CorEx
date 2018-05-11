@@ -18,132 +18,171 @@ import TVGL
 class Baseline(object):
     def __init__(self, name):
         self.name = name
+        self._trained = False
+        self._val_score = None
+        self._params = None
+        self._covs = None
+        self._method = None
 
-    def select(self, train_data, val_data, params):
+    def select(self, train_data, val_data, params, verbose=True):
+        if verbose:
+            print("\n{}\nSelecting the best parameter values for {} ...".format('-'*80, self.name))
+
+        best_score = 1e18
+        best_params = None
+        best_covs = None
+        best_method = None
+
+        const_params = dict()
+
+        search_params = []
+        for k, v in params.items():
+            if isinstance(v, list):
+                arr = [(k, x) for x in v]
+                search_params.append(arr)
+            elif isinstance(v, dict):
+                arr = []
+                for param_k, param_v in v.items():
+                    arr += list([(param_k, x) for x in param_v])
+                search_params.append(arr)
+            else:
+                const_params[k] = v
+
+        # add a dummy variable if the grid is empty
+        if len(search_params) == 0:
+            search_params = [[('__dummy__', None)]]
+
+        grid = list(itertools.product(*search_params))
+
+        for index, cur_params in enumerate(grid):
+            if verbose:
+                print("done {} / {}".format(index, len(grid)), end='')
+                print(" | running with ", end='')
+                for k, v in cur_params:
+                    if k != '__dummy__':
+                        print('{}: {}\t'.format(k, v), end='')
+                print('')
+
+            cur_params = dict(cur_params)
+            for k, v in const_params.items():
+                cur_params[k] = v
+            (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
+            cur_score = metric_utils.calculate_nll_score(data=val_data, covs=cur_covs)
+
+            if verbose:
+                print('\tcurrent score: {}'.format(cur_score))
+
+            if (best_params is None) or (not np.isnan(cur_score) and cur_score < best_score):
+                best_score = cur_score
+                best_params = cur_params
+                best_covs = cur_covs
+                best_method = cur_method
+        if verbose:
+            print('\nFinished with best validation score: {}'.format(best_score))
+
+        self._trained = True
+        self._val_score = best_score
+        self._params = best_params
+        self._covs = best_covs
+        self._method = best_method
+
+        return (best_score, best_params, best_covs, best_method)
+
+    def _train(self, train_data, params, verbose):
+        # should return a pair: (covs, method)
         raise NotImplementedError()
 
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
-        raise NotImplementedError()
+    def evaluate(self, test_data, verbose=True):
+        assert self._trained
+        if verbose:
+            print("Evaluating {} ...".format(self.name))
+        nll = metric_utils.calculate_nll_score(data=test_data, covs=self._covs)
+        if verbose:
+            print("\tScore: {:.4f}".format(nll))
+        return nll
 
-    def report_scores(self, scores, n_iter):
-        if not isinstance(scores, list):
-            scores = [scores] * n_iter
-        return {"mean": np.mean(scores),
-                "std": np.std(scores),
-                "min": np.min(scores),
-                "scores": scores}
+    def get_covariance(self):
+        assert self._trained
+        return self._covs
+
+    def timeit(self, train_data, params):
+        start_time = time.time()
+        dummy = self._train(train_data, params, verbose=False)
+        finish_time = time.time()
+        return finish_time - start_time
 
 
 class GroundTruth(Baseline):
     def __init__(self, covs, test_data, **kwargs):
         super(GroundTruth, self).__init__(**kwargs)
-        self.covs = covs
-        self.test_data = test_data
+        self._score = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        self._covs = covs
+        self._trained = True
 
-    def select(self, train_data, val_data, params):
-        print("Empty model selection for {}".format(self.name))
-        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
-        return ({}, score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
-        if verbose:
-            print("Evaluating {} ...".format(self.name))
-        start_time = time.time()
-        nll = metric_utils.calculate_nll_score(data=self.test_data, covs=self.covs)
-        finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+    def _train(self, train_data, params, verbose):
+        return (self._covs, None)
 
 
 class Diagonal(Baseline):
     def __init__(self, **kwargs):
         super(Diagonal, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Empty model selection for {}".format(self.name))
-        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
-        return ({}, score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} ...".format(self.name))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         covs = [np.diag(np.var(x, axis=0)) for x in train_data]
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class LedoitWolf(Baseline):
     def __init__(self, **kwargs):
         super(LedoitWolf, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Empty model selection for {}".format(self.name))
-        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
-        return ({}, score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} ...".format(self.name))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         covs = []
         for x in train_data:
             est = sk_cov.LedoitWolf()
             est.fit(x)
             covs.append(est.covariance_)
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class OAS(Baseline):
     def __init__(self, **kwargs):
         super(OAS, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Empty model selection for {}".format(self.name))
-        score = self.evaluate(train_data, val_data, params, n_iter=1, verbose=False)
-        return ({}, score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=False):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} ...".format(self.name))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         covs = []
         for x in train_data:
             est = sk_cov.OAS()
             est.fit(x)
             covs.append(est.covariance_)
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class PCA(Baseline):
     def __init__(self, **kwargs):
         super(PCA, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        for n_components in params['n_components']:
-            cur_params = {'n_components': n_components}
-            if best_params is None:
-                best_params = cur_params  # just to select one valid set of parameters
-            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
-            if not np.isnan(cur_score) and cur_score < best_score:
-                best_score = cur_score
-                best_params = cur_params
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} ...".format(self.name))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         try:
             covs = []
@@ -151,37 +190,23 @@ class PCA(Baseline):
                 est = sk_dec.PCA(n_components=params['n_components'])
                 est.fit(x)
                 covs.append(est.get_covariance())
-            nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         except Exception as e:
+            covs = None
             if verbose:
-                print("{} failed with message: {}".format(self.name, e.message))
-            nll = np.nan
+                print("\t{} failed with message: {}".format(self.name, e.message))
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class FactorAnalysis(Baseline):
     def __init__(self, **kwargs):
         super(FactorAnalysis, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        for n_components in params['n_components']:
-            cur_params = {'n_components': n_components}
-            if best_params is None:
-                best_params = cur_params  # just to select one valid set of parameters
-            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
-            if not np.isnan(cur_score) and cur_score < best_score:
-                best_score = cur_score
-                best_params = cur_params
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} ...".format(self.name))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         try:
             covs = []
@@ -189,170 +214,109 @@ class FactorAnalysis(Baseline):
                 est = sk_dec.FactorAnalysis(n_components=params['n_components'])
                 est.fit(x)
                 covs.append(est.get_covariance())
-            nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
         except Exception as e:
+            covs = None
             if verbose:
-                print("{} failed with message: {}".format(self.name, e.message))
-            nll = np.nan
+                print("\t{} failed with message: {}".format(self.name, e.message))
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(nll, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class GraphLasso(Baseline):
     def __init__(self, **kwargs):
         super(GraphLasso, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        for alpha in params['alpha']:
-            cur_params = {'alpha': alpha, 'max_iter': params['max_iter'], 'mode': params['mode']}
-            if best_params is None:
-                best_params = cur_params  # just to select one valid set of parameters
-            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
-            if not np.isnan(cur_score) and cur_score < best_score:
-                best_score = cur_score
-                best_params = cur_params
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} for {} iterations ...".format(self.name, n_iter))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         try:
-            scores = []
-            for iteration in range(n_iter):
-                covs = []
-                for x in train_data:
-                    est = sk_cov.GraphLasso(alpha=params['alpha'],
-                                            max_iter=params['max_iter'])
-                    est.fit(x)
-                    covs.append(est.covariance_)
-                cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-                scores.append(cur_nll)
+            covs = []
+            for x in train_data:
+                est = sk_cov.GraphLasso(alpha=params['alpha'],
+                                        max_iter=params['max_iter'])
+                est.fit(x)
+                covs.append(est.covariance_)
         except Exception as e:
             if verbose:
-                print("{} failed with message: {}".format(self.name, e.message))
-            scores = np.nan
+                print("\t{} failed with message: {}".format(self.name, e.message))
+            covs = None
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(scores, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
 
 class LinearCorex(Baseline):
     def __init__(self, **kwargs):
         super(LinearCorex, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        for n_hidden in params['n_hidden']:
-            cur_params = {'n_hidden': n_hidden, 'max_iter': params['max_iter'], 'anneal': True}
-            if best_params is None:
-                best_params = cur_params  # just to select one valid set of parameters
-            cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
-            if not np.isnan(cur_score) and cur_score < best_score:
-                best_score = cur_score
-                best_params = cur_params
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} for {} iterations ...".format(self.name, n_iter))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
-        scores = []
-        for iteration in range(n_iter):
-            covs = []
-            for x in train_data:
-                c = linearcorex.Corex(n_hidden=params['n_hidden'],
-                                      max_iter=params['max_iter'],
-                                      anneal=params['anneal'])
-                c.fit(x)
-                covs.append(c.get_covariance())
-            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-            scores.append(cur_nll)
-        finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(scores, n_iter)
-
-
-class LinearCorexWholeData(LinearCorex):
-    def __init__(self, **kwargs):
-        super(LinearCorexWholeData, self).__init__(**kwargs)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
-        if verbose:
-            print("Evaluating {} for {} iterations ...".format(self.name, n_iter))
-        start_time = time.time()
-        scores = []
-        for iteration in range(n_iter):
-            X = np.concatenate(train_data, axis=0)
+        covs = []
+        for x in train_data:
             c = linearcorex.Corex(n_hidden=params['n_hidden'],
                                   max_iter=params['max_iter'],
                                   anneal=params['anneal'])
-            c.fit(X)
-            covs = [c.get_covariance() for t in range(len(train_data))]
-            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-            scores.append(cur_nll)
+            c.fit(x)
+            covs.append(c.get_covariance())
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return self.report_scores(scores, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
+
+
+class LinearCorexWholeData(Baseline):
+    def __init__(self, **kwargs):
+        super(LinearCorexWholeData, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+        X = np.concatenate(train_data, axis=0)
+        c = linearcorex.Corex(n_hidden=params['n_hidden'],
+                              max_iter=params['max_iter'],
+                              anneal=params['anneal'])
+        c.fit(X)
+        covs = [c.get_covariance() for t in range(len(train_data))]
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, c)
 
 
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self, **kwargs):
         super(TimeVaryingGraphLasso, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        grid_size = len(params['lamb']) * len(params['beta']) * len(params['indexOfPenalty'])
-        done = 0
-        for lamb in params['lamb']:
-            for beta in params['beta']:
-                for indexOfPenalty in params['indexOfPenalty']:
-                    cur_params = dict({'lamb': lamb, 'beta': beta, 'indexOfPenalty': indexOfPenalty,
-                                       'max_iter': params['max_iter']})
-                    print("\rdone {} / {} {}".format(done, grid_size, ' ' * 10))
-                    if best_params is None:
-                        best_params = cur_params  # just to select one valid set of parameters
-                    cur_score = self.evaluate(train_data, val_data, cur_params, n_iter=1, verbose=False)['mean']
-                    if not np.isnan(cur_score) and cur_score < best_score:
-                        best_score = cur_score
-                        best_params = cur_params
-                    done += 1
-        print("\n")
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} for {} iterations ...".format(self.name, n_iter))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
         # construct time-series
         train_data_ts = []
         for x in train_data:
             train_data_ts += list(x)
         train_data_ts = np.array(train_data_ts)
-        scores = []
-        for iteration in range(n_iter):
-            inv_covs = TVGL.TVGL(data=train_data_ts,
-                                 lengthOfSlice=len(train_data[0]),
-                                 lamb=params['lamb'],
-                                 beta=params['beta'],
-                                 indexOfPenalty=params['indexOfPenalty'],
-                                 max_iter=params['max_iter'])
-            covs = [np.linalg.inv(x) for x in inv_covs]
-            cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-            scores.append(cur_nll)
+        inv_covs = TVGL.TVGL(data=train_data_ts,
+                             lengthOfSlice=len(train_data[0]),
+                             lamb=params['lamb'],
+                             beta=params['beta'],
+                             indexOfPenalty=params['indexOfPenalty'],
+                             max_iter=params['max_iter'])
+        covs = [np.linalg.inv(x) for x in inv_covs]
         finish_time = time.time()
-        print("\tElapsed time {:.1f}s, mean score = {}".format(finish_time - start_time, np.mean(scores)))
-        return self.report_scores(scores, n_iter)
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
 
     def timeit(self, train_data, params):
+        # need to write special timeit() to exclude the time spent for linalg.inv()
         train_data_ts = []
         for x in train_data:
             train_data_ts += list(x)
@@ -373,89 +337,17 @@ class TCorex(Baseline):
         self.tcorex = tcorex
         super(TCorex, self).__init__(**kwargs)
 
-    def select(self, train_data, val_data, params):
-        print("Selecting the best parameter values for {} ...".format(self.name))
-        best_score = 1e18
-        best_params = None
-        self.best_covs = None
-
-        const_params = dict()
-        search_params = []
-        for k, v in params.items():
-            if k in ['l1', 'l2']:
-                continue
-            if isinstance(v, list):
-                arr = [(k, x) for x in v]
-                search_params.append(arr)
-            else:
-                const_params[k] = v
-
-        # add L1/L2 regularization parameters
-        reg_params = []
-        if 'l1' in params:
-            reg_params += [('l1', x) for x in params['l1']]
-        if 'l2' in params:
-            reg_params += [('l2', x) for x in params['l2']]
-        if len(reg_params) > 0:
-            search_params.append(reg_params)
-
-        # add a dummy variable if the grid is empty
-        if len(search_params) == 0:
-            search_params = [[('dummy', None)]]
-
-        grid = list(itertools.product(*search_params))
-
-        for index, cur_params in enumerate(grid):
-            print("done {} / {}".format(index, len(grid)), end='')
-            print(" | running with ", end='')
-            for k, v in cur_params:
-                print('{}: {}\t'.format(k, v), end='')
-            print('')
-
-            cur_params = dict(cur_params)
-            for k, v in const_params.items():
-                cur_params[k] = v
-            cur_params['nt'] = len(train_data)
-
-            cur_score, covs = self.evaluate(train_data, val_data, cur_params,
-                                            n_iter=1, verbose=False, validation=True)
-            cur_score = cur_score['mean']
-
-            if (best_params is None) or (not np.isnan(cur_score) and cur_score < best_score):
-                best_score = cur_score
-                best_params = cur_params
-                self.best_covs = covs
-
-        print('\n')
-        return (best_params, best_score)
-
-    def evaluate(self, train_data, test_data, params, n_iter, verbose=True, validation=False):
+    def _train(self, train_data, params, verbose):
         if verbose:
-            print("Evaluating {} for {} iterations ...".format(self.name, n_iter))
+            print("Training {} ...".format(self.name))
         start_time = time.time()
 
-        scores = []
-        covs = None
-        if validation:
-            assert n_iter == 1
-            for iteration in range(n_iter):
-                c = self.tcorex(**params)
-                c.fit(train_data)
-                covs = c.get_covariance()
-                cur_nll = metric_utils.calculate_nll_score(data=test_data, covs=covs)
-                scores.append(cur_nll)
-        else:
-            scores = [metric_utils.calculate_nll_score(data=test_data, covs=self.best_covs)] * n_iter
-        finish_time = time.time()
-        print("\tElapsed time {:.1f}s, mean score = {}".format(finish_time - start_time, np.mean(scores)))
-        ret = self.report_scores(scores, n_iter)
-        if validation:
-            ret = (ret, covs)
-        return ret
-
-    def timeit(self, train_data, params):
+        params['nt'] = len(train_data)
         c = self.tcorex(**params)
-        start_time = time.time()
         c.fit(train_data)
+        covs = c.get_covariance()
+
         finish_time = time.time()
-        return finish_time - start_time
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, c)
