@@ -6,9 +6,11 @@ from scipy.stats import multivariate_normal
 from sklearn.datasets import make_spd_matrix
 
 import numpy as np
+
 np.random.seed(42)
 
 import random
+
 random.seed(42)
 
 import pandas as pd
@@ -204,7 +206,7 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
 
     alphas = np.linspace(0, 1.0, nt)
     for i, alpha in enumerate(alphas):
-        x_std = (1-alpha) * x_std_1 + alpha * x_std_2
+        x_std = (1 - alpha) * x_std_1 + alpha * x_std_2
         cor = (1 - alpha) * cor_1 + alpha * cor_2
         sigma = construct_ground_truth(nv, x_std, cor)
         ground_truth.append(sigma)
@@ -214,8 +216,8 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
     return (data, ground_truth)
 
 
-def load_stock_data(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
-                    start_date='2010-01-01', end_date='2011-01-01', stride='one'):
+def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
+                    start_date='2000-01-01', end_date='2018-01-01', stride='one'):
     print("Loading stock data ...")
     if data_type == 'stock_week':
         with open('../data/EOD_week.pkl', 'rb') as f:
@@ -227,23 +229,22 @@ def load_stock_data(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
         raise ValueError("Unrecognized value '{}' for data_type variable".format(data_type))
     df = df[df.index >= start_date]
     df = df[df.index <= end_date]
-    # df = df[['AAPL', 'MSFT', 'AMZN', 'INTC', 'BA', 'FDX']]
-    # df = df.loc[:, list(np.max(np.array(df), axis=0)<1)]
 
+    # shuffle the columns
     cols = list(df.columns)
     random.shuffle(cols)
-    df = df[cols[:nv]]
+    df = df[cols]
 
     train_data = []
     val_data = []
     test_data = []
 
     window = train_cnt + val_cnt + test_cnt
-
     if stride == 'one':
         indices = range(window, len(df) - window)
     if stride == 'full':
-        indices = range(window, len(df)-window, window+1)
+        indices = range(window, len(df) - window, window + 1)
+    assert len(indices) >= nt
 
     for i in indices:
         start = i - window
@@ -252,15 +253,53 @@ def load_stock_data(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
         random.shuffle(perm)
 
         part = np.array(df[start:end])
-        assert len(part) == 2*window + 1
+        assert len(part) == 2 * window + 1
 
         train_data.append(part[perm[:train_cnt]])
-        val_data.append(part[perm[train_cnt:train_cnt+val_cnt]])
+        val_data.append(part[perm[train_cnt:train_cnt + val_cnt]])
         test_data.append(part[perm[-test_cnt:]])
 
+    # take last nt time steps
+    train_data = np.array(train_data[-nt:])
+    val_data = np.array(val_data[-nt:])
+    test_data = np.array(test_data[-nt:])
+
+    # add small gaussian noise
+    noise_var = 1e-5
+    noise_myu = np.zeros((train_data.shape[-1],))
+    noise_cov = np.diag([noise_var] * train_data.shape[-1])
+    train_data += np.random.multivariate_normal(noise_myu, noise_cov, size=train_data.shape[:-1])
+    val_data += np.random.multivariate_normal(noise_myu, noise_cov, size=val_data.shape[:-1])
+    test_data += np.random.multivariate_normal(noise_myu, noise_cov, size=test_data.shape[:-1])
+
+    # find valid variables
+    valid_stocks = []
+    for i in range(train_data.shape[-1]):
+        ok = True
+        for t in range(train_data.shape[0]):
+            if np.var(train_data[t, :, i]) > 1e-2:
+                ok = False
+                break
+        if ok:
+            valid_stocks.append(i)
+
+    # select nv valid variables
+    print("\tremained {} variables".format(len(valid_stocks)))
+    assert len(valid_stocks) >= nv
+    valid_stocks = valid_stocks[:nv]
+    train_data = train_data[:, :, valid_stocks]
+    val_data = val_data[:, :, valid_stocks]
+    test_data = test_data[:, :, valid_stocks]
+
+    # scale the data (this is needed for T-GLASSO to work)
+    coef = np.sqrt(np.var(train_data, axis=0).mean())
+    train_data = train_data / coef
+    val_data = val_data / coef
+    test_data = test_data / coef
+
     print('Stock data is loaded:')
-    print('\ttrain shape:', np.array(train_data).shape)
-    print('\tval   shape:', np.array(val_data).shape)
-    print('\ttest  shape:', np.array(test_data).shape)
+    print('\ttrain shape:', train_data.shape)
+    print('\tval   shape:', val_data.shape)
+    print('\ttest  shape:', test_data.shape)
 
     return train_data, val_data, test_data

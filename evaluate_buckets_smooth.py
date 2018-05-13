@@ -226,7 +226,7 @@ def main():
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[-3:]:
+    for (method, params) in methods[:]:
         name = method.name
         best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
         results[name] = {}

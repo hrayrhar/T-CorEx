@@ -28,14 +28,8 @@ def main():
     args = parser.parse_args()
 
     args.train_data, args.val_data, args.test_data = load_stock_data(
-        nv=args.nv, train_cnt=args.train_cnt, val_cnt=args.val_cnt, test_cnt=args.test_cnt,
-        data_type=args.data_type, stride='full',
-        start_date='2000-01-01', end_date='2018-01-01')
-
-    args.train_data = args.train_data[-args.nt:]
-    args.val_data = args.val_data[-args.nt:]
-    args.test_data = args.test_data[-args.nt:]
-    args.nt = len(args.train_data)
+        nt=args.nt, nv=args.nv, train_cnt=args.train_cnt, val_cnt=args.val_cnt, test_cnt=args.test_cnt,
+        data_type=args.data_type, stride='full', start_date='2000-01-01', end_date='2018-01-01')
 
     print('train shape:', np.array(args.train_data).shape)
     print('val   shape:', np.array(args.val_data).shape)
@@ -130,7 +124,7 @@ def main():
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[-1:]:
+    for (method, params) in methods[:]:
         name = method.name
         best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
         results[name] = {}
