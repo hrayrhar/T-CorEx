@@ -125,15 +125,19 @@ def main():
 
     results = {}
     for (method, params) in methods[:]:
-        name = method.name
-        best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
-        results[name] = {}
-        results[name]['test_score'] = method.evaluate(args.test_data, best_params)
-        results[name]['best_params'] = best_params
-        results[name]['best_val_score'] = best_score
+        try:
+            name = method.name
+            best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
+            results[name] = {}
+            results[name]['test_score'] = method.evaluate(args.test_data, best_params)
+            results[name]['best_params'] = best_params
+            results[name]['best_val_score'] = best_score
 
-        with open(results_path, 'w') as f:
-            json.dump(results, f)
+            with open(results_path, 'w') as f:
+                json.dump(results, f)
+        except Exception as e:
+            print('Could not run method {}, expection with message {}'.format(name, e.message))
+
 
     print("Results are saved in {}".format(results_path))
 
