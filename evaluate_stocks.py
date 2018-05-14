@@ -17,7 +17,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--nt', type=int, help='number of buckets')
     parser.add_argument('--nv', type=int, help='number of variables')
-    parser.add_argument('--m', type=int, help='number of latent factors')
     parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
     parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')
@@ -117,16 +116,16 @@ def main():
         })
     ]
 
-    exp_name = '{}.m{}.train_cnt{}.val_cnt{}.test_cnt{}'.format(args.data_type, args.m, args.train_cnt,
-                                                                args.val_cnt, args.test_cnt)
+    exp_name = '{}.nv{}.train_cnt{}.val_cnt{}.test_cnt{}'.format(args.data_type, args.nv, args.train_cnt,
+                                                                 args.val_cnt, args.test_cnt)
     exp_name = args.prefix + exp_name
     results_path = "results/{}.results.json".format(exp_name)
     make_sure_path_exists(results_path)
 
     results = {}
     for (method, params) in methods[:]:
+        name = method.name
         try:
-            name = method.name
             best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
             results[name] = {}
             results[name]['test_score'] = method.evaluate(args.test_data, best_params)
@@ -137,7 +136,6 @@ def main():
                 json.dump(results, f)
         except Exception as e:
             print('Could not run method {}, expection with message {}'.format(name, e.message))
-
 
     print("Results are saved in {}".format(results_path))
 
