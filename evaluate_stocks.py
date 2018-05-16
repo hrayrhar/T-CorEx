@@ -116,8 +116,8 @@ def main():
         })
     ]
 
-    exp_name = '{}.nv{}.train_cnt{}.val_cnt{}.test_cnt{}'.format(args.data_type, args.nv, args.train_cnt,
-                                                                 args.val_cnt, args.test_cnt)
+    exp_name = '{}.nt{}.nv{}.train_cnt{}.val_cnt{}.test_cnt{}'.format(args.data_type, args.nt, args.nv,
+                                                                      args.train_cnt, args.val_cnt, args.test_cnt)
     exp_name = args.prefix + exp_name
     results_path = "results/{}.results.json".format(exp_name)
     make_sure_path_exists(results_path)

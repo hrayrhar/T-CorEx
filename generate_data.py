@@ -6,16 +6,9 @@ from scipy.stats import multivariate_normal
 from sklearn.datasets import make_spd_matrix
 
 import numpy as np
-
-np.random.seed(42)
-
 import random
-
-random.seed(42)
-
 import pandas as pd
 import sklearn.covariance as skcov
-
 import pickle as pkl
 
 
@@ -36,6 +29,9 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
     :param max_var: Maximum variance of x_i.
     :return: (data, ground_truth_cov)
     """
+    random.seed(42)
+    np.random.seed(42)
+
     assert nv % m == 0
     block_size = nv // m
 
@@ -97,6 +93,8 @@ def generate_nglf_from_matrix(nv, m, nt, ns, param=8, normalize=False):
     :param normalize: Whether to set Var[x] = 1
     :return: (data, ground_truth_cov)
     """
+    random.seed(42)
+    np.random.seed(42)
 
     assert nv % m == 0
     b = nv // m  # block size
@@ -129,6 +127,9 @@ def generate_general_make_spd(nv, m, nt, ns, normalize=False):
     :param normalize: Whether to set Var[x] = 1
     :return: (data, ground_truth_cov)
     """
+    random.seed(42)
+    np.random.seed(42)
+
     assert nv % m == 0
     b = nv // m  # block size
 
@@ -166,6 +167,9 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
     :param max_var: Maximum variance of x_i.
     :return: (data, ground_truth_cov)
     """
+    random.seed(42)
+    np.random.seed(42)
+
     assert nv % m == 0
     block_size = nv // m
 
@@ -218,6 +222,9 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
 
 def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
                     start_date='2000-01-01', end_date='2018-01-01', stride='one'):
+    random.seed(42)
+    np.random.seed(42)
+
     print("Loading stock data ...")
     if data_type == 'stock_week':
         with open('../data/EOD_week.pkl', 'rb') as f:
@@ -231,7 +238,7 @@ def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
     df = df[df.index <= end_date]
 
     # shuffle the columns
-    cols = list(df.columns)
+    cols = sorted(list(df.columns))
     random.shuffle(cols)
     df = df[cols]
 
