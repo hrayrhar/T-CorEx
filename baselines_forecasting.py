@@ -76,7 +76,7 @@ class Baseline(object):
 
         if verbose:
             print('\nFinished with best validation score: {}'.format(best_score))
-            print("Training the best method again with validation data included")
+            print("Training the best method again with validation data included ...")
 
         self._trained = True
         self._val_score = best_score
@@ -278,7 +278,7 @@ class TimeVaryingGraphLasso(Baseline):
         super(TimeVaryingGraphLasso, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
-        train_data = make_buckets(data, params['bucket_size'])
+        train_data = make_buckets(train_data, params['bucket_size'])
         train_data = np.concatenate(train_data, axis=0)  # make time-series
         if verbose:
             print("Training {} ...".format(self.name))
@@ -316,7 +316,7 @@ class TCorex(Baseline):
         super(TCorex, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
-        train_data = make_buckets(train_data, params['block_size'])
+        train_data = make_buckets(train_data, params['bucket_size'])
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
