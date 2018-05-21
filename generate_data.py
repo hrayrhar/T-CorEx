@@ -310,3 +310,69 @@ def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
     print('\ttest  shape:', test_data.shape)
 
     return train_data, val_data, test_data
+
+
+def load_stock_data_forecasting(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
+                                start_date='2000-01-01', end_date='2018-01-01'):
+    random.seed(42)
+    np.random.seed(42)
+
+    print("Loading stock data ...")
+    if data_type == 'stock_week':
+        with open('../data/EOD_week.pkl', 'rb') as f:
+            df = pd.DataFrame(pkl.load(f))
+    elif data_type == 'stock_day':
+        with open('../data/EOD_day.pkl', 'rb') as f:
+            df = pd.DataFrame(pkl.load(f))
+    else:
+        raise ValueError("Unrecognized value '{}' for data_type variable".format(data_type))
+    df = df[df.index >= start_date]
+    df = df[df.index <= end_date]
+
+    # shuffle the columns
+    cols = sorted(list(df.columns))
+    random.shuffle(cols)
+    df = df[cols]
+
+    n_samples = train_cnt + val_cnt + test_cnt
+    assert n_samples <= len(df)
+    df = df[-n_samples:]  # NOTE: this will give just one period. TODO: return multiple periods (sliding window).
+
+    train_data = np.array(df[:train_cnt])
+    val_data = np.array(df[train_cnt:train_cnt+val_cnt])
+    test_data = np.array(df[-test_cnt:])
+
+    # add small gaussian noise
+    noise_var = 1e-5
+    noise_myu = np.zeros((train_data.shape[-1],))
+    noise_cov = np.diag([noise_var] * train_data.shape[-1])
+    train_data += np.random.multivariate_normal(noise_myu, noise_cov, size=train_data.shape[:-1])
+    val_data += np.random.multivariate_normal(noise_myu, noise_cov, size=val_data.shape[:-1])
+    test_data += np.random.multivariate_normal(noise_myu, noise_cov, size=test_data.shape[:-1])
+
+    # find valid variables
+    valid_stocks = []
+    for i in range(train_data.shape[-1]):
+        if np.var(train_data[:, i]) < 1e-2:
+            valid_stocks.append(i)
+
+    # select nv valid variables
+    print("\tremained {} variables".format(len(valid_stocks)))
+    assert len(valid_stocks) >= nv
+    valid_stocks = valid_stocks[:nv]
+    train_data = train_data[:, valid_stocks]
+    val_data = val_data[:, valid_stocks]
+    test_data = test_data[:, valid_stocks]
+
+    # scale the data (this is needed for T-GLASSO to work)
+    coef = np.median(np.sqrt(np.var(train_data, axis=0)))  # median works better than mean because of large outliers
+    train_data = train_data / coef
+    val_data = val_data / coef
+    test_data = test_data / coef
+
+    print('Stock data is loaded:')
+    print('\ttrain shape:', train_data.shape)
+    print('\tval   shape:', val_data.shape)
+    print('\ttest  shape:', test_data.shape)
+
+    return train_data, val_data, test_data
