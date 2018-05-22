@@ -64,7 +64,6 @@ class Baseline(object):
             for k, v in const_params.items():
                 cur_params[k] = v
             (cur_cov, cur_method) = self._train(train_data, cur_params, verbose)
-            print("Done!")
             cur_score = metric_utils.calculate_nll_score(data=[val_data], covs=[cur_cov])
 
             if verbose:
@@ -265,7 +264,7 @@ class LinearCorex(Baseline):
 
 
 def make_buckets(data, bucket_size):
-    data_size = bucket_size
+    data_size = data.shape[0]
     rem = data_size % bucket_size
     buckets = []
     for start in range(rem, data_size, bucket_size):
@@ -316,13 +315,16 @@ class TCorex(Baseline):
         super(TCorex, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
-        train_data = make_buckets(train_data, params['bucket_size'])
+        bucket_size = params['bucket_size']
+        train_data = make_buckets(train_data, bucket_size)
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
 
         params['nt'] = len(train_data)
+        del params['bucket_size']
         c = self.tcorex(**params)
+        params['bucket_size'] = bucket_size
         c.fit(train_data)
         covs = c.get_covariance()
 
