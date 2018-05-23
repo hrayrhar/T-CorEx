@@ -12,7 +12,32 @@ import sklearn.covariance as skcov
 import pickle as pkl
 
 
-def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
+def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
+                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False):
+    random.seed(42)
+    np.random.seed(42)
+
+    if nglf:
+        (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+        (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+    else:
+        (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                                    shuffle=shuffle)
+        (data2, sigma2) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                                    shuffle=shuffle)
+
+    data = data1 + data2
+    ground_truth_covs = [sigma1 for t in range(nt // 2)] + [sigma2 for t in range(nt // 2)]
+    train_data = [x[:train_cnt] for x in data]
+    val_data = [x[train_cnt:train_cnt + val_cnt] for x in data]
+    test_data = [x[-test_cnt:] for x in data]
+
+    return train_data, val_data, test_data, ground_truth_covs
+
+
+def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=False):
     """ Generates data according to an NGLF model.
 
     :param nv:      Number of observed variables
@@ -20,39 +45,32 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
     :param nt:      Number of time steps
     :param ns:      Number of samples for each time step
     :param snr:     Signal to noise ratio.
-                    If `snr` is none `min_cor` will be used
-    :param min_cor: Minimum absolute value of correlations between x_i and z_j.
-                    This will not be used if `snr` is not none.
-    :param max_cor: Maximum absolute value of correlations between x_i and z_j.
-                    This will not be used if `snr` is not none.
     :param min_var: Minimum variance of x_i.
     :param max_var: Maximum variance of x_i.
+    :param shuffle: Whether to shuffle to x_i's
     :return: (data, ground_truth_cov)
     """
-    random.seed(42)
-    np.random.seed(42)
 
     assert nv % m == 0
     block_size = nv // m
+
+    par = [i // block_size for i in range(nv)]
+    if shuffle:
+        random.shuffle(par)
 
     # Generate parameters for p(x,z) joint model
     # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_var, max_var, size=(nv,))
     cor_signs = np.sign(np.random.normal(size=(nv,)))
-
-    if snr is None:
-        cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
-        snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
-        print("Average SNR: {}".format(snr))
-    else:
-        cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
-        print("Fixed SNR: {}".format(snr))
+    mean_rho = np.sqrt(snr / (snr + 1.0))
+    cor = cor_signs * mean_rho
+    print("Fixed SNR: {}".format(snr))
 
     # Construct the ground truth covariance matrix of x
     ground_truth = np.zeros((nv, nv))
     for i in range(nv):
         for j in range(nv):
-            if i // block_size != j // block_size:
+            if par[i] != par[j]:
                 continue
             if i == j:
                 ground_truth[i][j] = x_std[i] ** 2
@@ -67,8 +85,7 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
         z = [np.random.normal(0.0, v) for v in z_std]
         x = np.zeros((nv,))
         for i in range(nv):
-            par = i // block_size
-            cond_mean = cor[i] * x_std[i] * z[par]
+            cond_mean = cor[i] * x_std[i] * z[par[i]]
             cond_var = x_std[i] ** 2 * (1 - cor[i] ** 2)
             x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
         return x
@@ -82,42 +99,7 @@ def generate_nglf_from_model(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, 
              for t in range(nt)], ground_truth)
 
 
-def generate_nglf_from_matrix(nv, m, nt, ns, param=8, normalize=False):
-    """ Generate NGLF data from covariance matrix I + dot(v, v.t), where v is a random vector.
-
-    :param nv:        Number of observed variables
-    :param m:         Number of latent factors
-    :param nt:        Number of time steps
-    :param ns:        Number of samples for each time step
-    :param param:     Parameter of uniform distribution used to generate random vector v
-    :param normalize: Whether to set Var[x] = 1
-    :return: (data, ground_truth_cov)
-    """
-    random.seed(42)
-    np.random.seed(42)
-
-    assert nv % m == 0
-    b = nv // m  # block size
-
-    sigma = np.zeros((nv, nv))
-    for i in range(m):
-        random_vector = np.random.uniform(-param, +param, size=(b,))
-        block_cov = np.eye(b) + np.outer(random_vector, random_vector)
-        if normalize:
-            std = np.sqrt(block_cov.diagonal()).reshape((b, 1))
-            block_cov /= std
-            block_cov /= std.T
-        sigma[i * b:(i + 1) * b, i * b:(i + 1) * b] = block_cov
-
-    def generate_single():
-        myu = np.zeros((nv,))
-        return np.random.multivariate_normal(myu, sigma)
-
-    return ([np.array([generate_single() for i in range(ns)])
-             for t in range(nt)], sigma)
-
-
-def generate_general_make_spd(nv, m, nt, ns, normalize=False):
+def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
     """ Generate general data using make_spd_matrix() function.
 
     :param nv:        Number of observed variables
@@ -127,8 +109,6 @@ def generate_general_make_spd(nv, m, nt, ns, normalize=False):
     :param normalize: Whether to set Var[x] = 1
     :return: (data, ground_truth_cov)
     """
-    random.seed(42)
-    np.random.seed(42)
 
     assert nv % m == 0
     b = nv // m  # block size
