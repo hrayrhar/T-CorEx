@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--bs', type=int, help='block size')
     parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
-    parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')
+    parser.add_argument('--test_cnt', default=1000, type=int, help='number of test samples')
     parser.add_argument('--snr', type=float, default=5.0, help='signal to noise ratio')
     parser.add_argument('--min_var', type=float, default=0.25, help='minimum x-variance')
     parser.add_argument('--max_var', type=float, default=4.0, help='maximum x-variance')
@@ -33,6 +33,7 @@ def main():
     parser.set_defaults(shuffle=False)
     args = parser.parse_args()
     args.nv = args.m * args.bs
+    print(args)
 
     ''' Load data '''
     args.train_data, args.val_data, args.test_data, args.ground_truth_covs = load_sudden_change(
@@ -81,16 +82,16 @@ def main():
             'anneal': True}),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
-            'lamb': [0.01, 0.03, 0.1, 0.3, 1.0],
-            'beta': [0.03, 0.1, 0.3, 1.0, 3.0],
+            'lamb': [0.03, 0.1, 0.3, 1.0, 3.0],
+            'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'indexOfPenalty': [1],
-            'max_iter': 100}),
+            'max_iter': 500}),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
-            'lamb': [0.003, 0.01, 0.03, 0.1, 0.3, 1.0],
+            'lamb': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
             'beta': [0.0],
             'indexOfPenalty': [1],
-            'max_iter': 100}),
+            'max_iter': 500}),
 
         # (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
         #     'nv': args.nv,

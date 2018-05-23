@@ -20,11 +20,17 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
     if nglf:
         (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
                                         snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+        # make sure the second generated matrix will be the same no matter of train_cnt
+        random.seed(77)
+        np.random.seed(77)
         (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
                                         snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
     else:
         (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
                                                     shuffle=shuffle)
+        # make sure the second generated matrix will be the same no matter of train_cnt
+        random.seed(77)
+        np.random.seed(77)
         (data2, sigma2) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
                                                     shuffle=shuffle)
 
