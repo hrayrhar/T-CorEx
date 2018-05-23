@@ -81,8 +81,8 @@ def main():
             'anneal': True}),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
-            'lamb': [0.01, 0.03, 0.1, 0.3],
-            'beta': [0.03, 0.1, 0.3, 1.0],
+            'lamb': [0.01, 0.03, 0.1, 0.3, 1.0],
+            'beta': [0.03, 0.1, 0.3, 1.0, 3.0],
             'indexOfPenalty': [1],
             'max_iter': 100}),
 
@@ -110,8 +110,8 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                'l1': [0, 0.001, 0.003],
+                'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l1': [0, 0.001, 0.003],
                 'l2': []
             },
             'reg_type': 'W'
@@ -209,7 +209,38 @@ def main():
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': False
-        }),
+        })
+
+        # (baselines.TCorex(tcorex=TCorexWeightedObjective, name='T-Corex (W, weighted objective)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': [args.m],
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
+        #     'gamma': tcorex_gamma_range,
+        #     'reg_type': 'W',
+        #     'init': True
+        # }),
+
+        # (baselines.TCorex(tcorex=TCorexWeightsMod, name='T-Corex (W, weighted samples, modified)'), {
+        #     'nv': args.nv,
+        #     'n_hidden': [args.m],
+        #     'max_iter': 500,
+        #     'anneal': True,
+        #     'reg_params': {
+        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+        #         # 'l2': [0, 0.001, 0.003],
+        #     },
+        #     'gamma': tcorex_gamma_range,
+        #     'reg_type': 'W',
+        #     'init': True,
+        #     'sample_cnt': 256
+        # })
     ]
 
     exp_name = '{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_var{:.2f}.max_var{:.2f}'.format(
