@@ -85,7 +85,7 @@ def main():
             'lamb': [0.03, 0.1, 0.3, 1.0, 3.0],
             'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'indexOfPenalty': [1],
-            'max_iter': 500}),
+            'max_iter': 500}),  # NOTE: checked 1500 no improvement
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
             'lamb': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
