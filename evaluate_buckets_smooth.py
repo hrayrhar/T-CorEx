@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--bs', type=int, help='block size')
     parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
-    parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')
+    parser.add_argument('--test_cnt', default=100, type=int, help='number of test samples')  # TODO: make this 1000
     parser.add_argument('--snr', type=float, default=None, help='signal to noise ratio')
     parser.add_argument('--min_cor', type=float, default=0.8, help='minimum correlation between a child and parent')
     parser.add_argument('--max_cor', type=float, default=1.0, help='minimum correlation between a child and parent')
@@ -31,6 +31,7 @@ def main():
                         choices=['syn_nglf_buckets_smooth'], help='which dataset to load/create')
     args = parser.parse_args()
     args.nv = args.m * args.bs
+    print(args)
 
     ''' Load data '''
     (data, args.ground_truth_covs) = generate_nglf_smooth(nv=args.nv, m=args.m, nt=args.nt,
