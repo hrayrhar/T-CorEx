@@ -326,9 +326,9 @@ class TCorex(Baseline):
         c = self.tcorex(**params)
         params['bucket_size'] = bucket_size
         c.fit(train_data)
-        covs = c.get_covariance()
+        cov = c.get_covariance()[-1]
 
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, c)
+        return (cov, c)
