@@ -93,18 +93,6 @@ def main():
             'indexOfPenalty': [1],
             'max_iter': 500}),
 
-        # (baselines.TCorex(tcorex=TCorex, name='T-Corex (Sigma)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': args.m,
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         'l2': [],
-        #     },
-        #     'reg_type': 'Sigma'
-        # }),
-
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
             'nv': args.nv,
             'n_hidden': args.m,
@@ -117,56 +105,6 @@ def main():
             },
             'reg_type': 'W'
         }),
-
-        # (baselines.TCorex(tcorex=TCorexPrior1, name='T-Corex + priors (W, method 1)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         'l1': [0, 0.03, 0.1, 0.3, 1.0],
-        #         'l2': [],
-        #     },
-        #     # 'lamb': [0.0, 0.5, 0.9, 0.99],
-        #     'lamb': [0.0],
-        #     'reg_type': 'W',
-        #     'init': True
-        # }),
-        #
-        # (baselines.TCorex(tcorex=TCorexPrior2, name='T-Corex + priors (W, method 2)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         'l1': [0, 0.03, 0.1, 0.3, 1.0],
-        #         'l2': [],
-        #     },
-        #     # 'lamb': [0.0, 0.5, 0.9, 0.99],
-        #     'lamb': [0.0],
-        #     'reg_type': 'W',
-        #     'init': True
-        # }),
-        #
-        # (baselines.TCorex(tcorex=TCorexPrior2Weights, name='T-Corex + priors (W, method 2, weighted samples)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
-        #         'l2': [],
-        #     },
-        #     # 'lamb': [0.0, 0.5, 0.9, 0.99],
-        #     'lamb': [0.5],
-        #     # 'gamma': [1.25, 1.5, 2.0, 2.5, 1e5],
-        #     'gamma': [1e5],
-        #     'reg_type': 'W',
-        #     'init': True
-        # }),
 
         (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
             'nv': args.nv,
@@ -211,37 +149,6 @@ def main():
             'reg_type': 'W',
             'init': False
         }),
-
-        # (baselines.TCorex(tcorex=TCorexWeightedObjective, name='T-Corex (W, weighted objective)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         # 'l2': [0, 0.001, 0.003],
-        #     },
-        #     'gamma': tcorex_gamma_range,
-        #     'reg_type': 'W',
-        #     'init': True
-        # }),
-
-        # (baselines.TCorex(tcorex=TCorexWeightsMod, name='T-Corex (W, weighted samples, modified)'), {
-        #     'nv': args.nv,
-        #     'n_hidden': [args.m],
-        #     'max_iter': 500,
-        #     'anneal': True,
-        #     'reg_params': {
-        #         'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-        #         # 'l2': [0, 0.001, 0.003],
-        #     },
-        #     'gamma': tcorex_gamma_range,
-        #     'reg_type': 'W',
-        #     'init': True,
-        #     'sample_cnt': 256
-        # })
 
         (baselines.QUIC(name='QUIC'), {
             'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],

@@ -12,37 +12,6 @@ import sklearn.covariance as skcov
 import pickle as pkl
 
 
-def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
-                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False):
-    random.seed(42)
-    np.random.seed(42)
-
-    if nglf:
-        (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
-        # make sure the second generated matrix will be the same no matter of train_cnt
-        random.seed(77)
-        np.random.seed(77)
-        (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
-    else:
-        (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                                    shuffle=shuffle)
-        # make sure the second generated matrix will be the same no matter of train_cnt
-        random.seed(77)
-        np.random.seed(77)
-        (data2, sigma2) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                                    shuffle=shuffle)
-
-    data = data1 + data2
-    ground_truth_covs = [sigma1 for t in range(nt // 2)] + [sigma2 for t in range(nt // 2)]
-    train_data = [x[:train_cnt] for x in data]
-    val_data = [x[train_cnt:train_cnt + val_cnt] for x in data]
-    test_data = [x[-test_cnt:] for x in data]
-
-    return train_data, val_data, test_data, ground_truth_covs
-
-
 def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=False):
     """ Generates data according to an NGLF model.
 
@@ -136,19 +105,45 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
              for t in range(nt)], sigma)
 
 
-def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_var=1.0, max_var=4.0):
-    """ Generates data according to an NGLF model.
+def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
+                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False):
+    random.seed(42)
+    np.random.seed(42)
+
+    if nglf:
+        (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+        # make sure the second generated matrix will be the same no matter of train_cnt
+        random.seed(77)
+        np.random.seed(77)
+        (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+    else:
+        (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                                    shuffle=shuffle)
+        # make sure the second generated matrix will be the same no matter of train_cnt
+        random.seed(77)
+        np.random.seed(77)
+        (data2, sigma2) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
+                                                    shuffle=shuffle)
+
+    data = data1 + data2
+    ground_truth_covs = [sigma1 for t in range(nt // 2)] + [sigma2 for t in range(nt // 2)]
+    train_data = [x[:train_cnt] for x in data]
+    val_data = [x[train_cnt:train_cnt + val_cnt] for x in data]
+    test_data = [x[-test_cnt:] for x in data]
+
+    return train_data, val_data, test_data, ground_truth_covs
+
+
+def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
+    """ Generates smooth changing NGLF data.
 
     :param nv:      Number of observed variables
     :param m:       Number of latent factors
     :param nt:      Number of time steps
     :param ns:      Number of test samples for each time step
     :param snr:     Signal to noise ratio.
-                    If `snr` is none `min_cor` will be used
-    :param min_cor: Minimum absolute value of correlations between x_i and z_j.
-                    This will not be used if `snr` is not none.
-    :param max_cor: Maximum absolute value of correlations between x_i and z_j.
-                    This will not be used if `snr` is not none.
     :param min_var: Minimum variance of x_i.
     :param max_var: Maximum variance of x_i.
     :return: (data, ground_truth_cov)
@@ -159,20 +154,15 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
     assert nv % m == 0
     block_size = nv // m
 
-    def generate_sufficient_params(nv, m, snr, min_cor, min_var, max_var):
+    def generate_sufficient_params(nv, snr, min_var, max_var):
         # Generate parameters for p(x,z) joint model
         # NOTE: as z_std doesn't matter, we will set it 1.
         x_std = np.random.uniform(min_var, max_var, size=(nv,))
         cor_signs = np.sign(np.random.normal(size=(nv,)))
-
-        if snr is None:
-            cor = cor_signs * np.random.uniform(min_cor, max_cor, size=(nv,))
-            snr = np.mean([x ** 2 / (1 - x ** 2) for x in cor])  # TODO: check this (upd: seems correct)
-            print("Average SNR: {}".format(snr))
-        else:
-            cor = cor_signs * np.array([np.sqrt(float(snr) / (snr + 1)) for i in range(nv)])
-            print("Fixed SNR: {}".format(snr))
-        return (x_std, cor)
+        mean_rho = np.sqrt(float(snr) / (snr + 1))
+        cor = mean_rho * cor_signs
+        print("Fixed SNR: {}".format(snr))
+        return x_std, cor
 
     def construct_ground_truth(nv, x_std, cor):
         # Construct the ground truth covariance matrix of x
@@ -188,8 +178,8 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
         return sigma
 
     # Generate Data
-    (x_std_1, cor_1) = generate_sufficient_params(nv, m, snr, min_cor, min_var, max_var)
-    (x_std_2, cor_2) = generate_sufficient_params(nv, m, snr, min_cor, min_var, max_var)
+    (x_std_1, cor_1) = generate_sufficient_params(nv, snr, min_var, max_var)
+    (x_std_2, cor_2) = generate_sufficient_params(nv, snr, min_var, max_var)
 
     ground_truth = []
     data = np.zeros((nt, ns, nv))
@@ -203,7 +193,7 @@ def generate_nglf_smooth(nv, m, nt, ns, snr=None, min_cor=0.8, max_cor=1.0, min_
         myu = np.zeros((nv,))
         data[i, :] = np.random.multivariate_normal(myu, sigma, size=(ns,))
 
-    return (data, ground_truth)
+    return data, ground_truth
 
 
 def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
