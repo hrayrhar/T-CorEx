@@ -10,9 +10,14 @@ import numpy as np
 import time
 import itertools
 
+import os
 import sys
 sys.path.append('../TVGL')
 import TVGL
+
+from scipy.io import savemat, loadmat
+from subprocess import Popen, PIPE
+import random
 
 
 class Baseline(object):
@@ -351,3 +356,55 @@ class TCorex(Baseline):
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return (covs, c)
+
+
+class QUIC(Baseline):
+    def __init__(self, **kwargs):
+        super(QUIC, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+
+        # create exp_id.m file to execute QUIC
+        exp_id = random.randint(0, 2 ** 64)
+        with open('{}.m'.format(exp_id), 'w') as f:
+            f.write("cd QUIC;\n")
+            f.write("mex -llapack QUIC.C QUIC-mex.C;\n")
+            f.write("load('../{}.in.mat');\n".format(exp_id))
+            f.write("[X W opt cputime iter dGap] = QUIC('default', sample_cov, lamb, tol, msg, max_iter);\n")
+            f.write("save('-mat', '../{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
+            f.write("cd ..;\n")
+
+        covs = []
+        for X in train_data:
+            # create exp_id.in.mat file
+            savemat('{}.in.mat'.format(exp_id), {
+                'sample_cov': np.dot(X.T, X) / X.shape[0],
+                'lamb': np.float(params['lamb']),
+                'max_iter': params['max_iter'],
+                'tol': params['tol'],
+                'msg': params['msg']
+            })
+
+            # run created exp_id.m file and wait
+            process = Popen(['octave', '{}.m'.format(exp_id)], stdout=PIPE, stderr=PIPE)
+            process.wait()
+            if verbose:
+                stdout, stderr = process.communicate()
+                # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
+
+            # collect outputs from exp_id.out.mat file
+            outs = loadmat('{}.out.mat'.format(exp_id))
+            covs.append(np.linalg.inv(outs['X']))
+
+        # delete files
+        os.remove('{}.in.mat'.format(exp_id))
+        os.remove('{}.out.mat'.format(exp_id))
+        os.remove('{}.m'.format(exp_id))
+
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return (covs, None)
