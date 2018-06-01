@@ -2,6 +2,8 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+from scipy.io import savemat, loadmat
+from subprocess import Popen, PIPE
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
 import metric_utils
@@ -9,15 +11,13 @@ import linearcorex
 import numpy as np
 import time
 import itertools
+import random
+import re
 
 import os
 import sys
 sys.path.append('../TVGL')
 import TVGL
-
-from scipy.io import savemat, loadmat
-from subprocess import Popen, PIPE
-import random
 
 
 class Baseline(object):
@@ -91,7 +91,7 @@ class Baseline(object):
         self._covs = best_covs
         self._method = best_method
 
-        return (best_score, best_params, best_covs, best_method)
+        return best_score, best_params, best_covs, best_method
 
     def _train(self, train_data, params, verbose):
         # should return a pair: (covs, method)
@@ -125,7 +125,7 @@ class GroundTruth(Baseline):
         self._trained = True
 
     def _train(self, train_data, params, verbose):
-        return (self._covs, None)
+        return self._covs, None
 
 
 class Diagonal(Baseline):
@@ -140,7 +140,7 @@ class Diagonal(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class LedoitWolf(Baseline):
@@ -159,7 +159,7 @@ class LedoitWolf(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class OAS(Baseline):
@@ -178,7 +178,7 @@ class OAS(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class PCA(Baseline):
@@ -202,7 +202,7 @@ class PCA(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class FactorAnalysis(Baseline):
@@ -226,7 +226,7 @@ class FactorAnalysis(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class GraphLasso(Baseline):
@@ -251,7 +251,7 @@ class GraphLasso(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class LinearCorex(Baseline):
@@ -272,7 +272,7 @@ class LinearCorex(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
 
 class LinearCorexWholeData(Baseline):
@@ -292,7 +292,7 @@ class LinearCorexWholeData(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, c)
+        return covs, c
 
 
 class TimeVaryingGraphLasso(Baseline):
@@ -318,7 +318,7 @@ class TimeVaryingGraphLasso(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
 
     def timeit(self, train_data, params):
         # need to write special timeit() to exclude the time spent for linalg.inv()
@@ -355,7 +355,7 @@ class TCorex(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, c)
+        return covs, c
 
 
 class QUIC(Baseline):
@@ -407,4 +407,69 @@ class QUIC(Baseline):
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return (covs, None)
+        return covs, None
+
+
+class BigQUIC(Baseline):
+    def __init__(self, **kwargs):
+        super(BigQUIC, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+
+        exp_id = random.randint(0, 2 ** 64)
+        covs = []
+        for X in train_data:
+            # create exp_id.in.txt file
+            with open('{}.in.txt'.format(exp_id), 'w') as f:
+                f.write('{} {}\n'.format(X.shape[1], X.shape[0]))
+                for x in X:
+                    f.write(' '.join(['{:.9f}'.format(t) for t in x]) + '\n')
+
+            # build exp_id.sh file
+            with open('{}.sh'.format(exp_id), 'w') as f:
+                f.write('cd BigQUIC_release/bigquic/;\n')
+                f.write('./bigquic-run -l {} -t {} -q {} -e {} ../../{}.in.txt ../../{}.out.txt;\n'.format(
+                    params['lamb'],
+                    params['max_iter'],
+                    params['verbose'],
+                    params['tol'],
+                    exp_id,
+                    exp_id
+                ))
+                f.write('cd ../../\n')
+
+            # run created exp_id.m file and wait
+            process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
+            process.wait()
+            if verbose:
+                stdout, stderr = process.communicate()
+                # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
+
+            # collect outputs from exp_id.out.txt file
+            nv = X.shape[1]
+            precision_mat = np.zeros((nv, nv))
+            with open('{}.out.txt'.format(exp_id), 'r') as f:
+                ret = re.search('p: ([0-9]+), nnz: ([0-9]+)', f.readline())
+                p = int(ret.group(1))
+                non_zero = int(ret.group(2))
+                assert p == nv
+                for i in range(non_zero):
+                    mas = f.readline().split(' ')
+                    row, col = map(int, mas[:2])
+                    value = float(mas[2])
+                    precision_mat[row-1, col-1] = value
+
+            covs.append(np.linalg.inv(precision_mat))
+
+        # delete files
+        os.remove('{}.in.txt'.format(exp_id))
+        os.remove('{}.out.txt'.format(exp_id))
+        os.remove('{}.sh'.format(exp_id))
+
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return covs, None

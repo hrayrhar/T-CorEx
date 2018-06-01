@@ -19,9 +19,9 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=Fal
     :param m:       Number of latent factors
     :param nt:      Number of time steps
     :param ns:      Number of samples for each time step
-    :param snr:     Signal to noise ratio.
-    :param min_var: Minimum variance of x_i.
-    :param max_var: Maximum variance of x_i.
+    :param snr:     Signal to noise ratio
+    :param min_var: Minimum variance of x_i
+    :param max_var: Maximum variance of x_i
     :param shuffle: Whether to shuffle to x_i's
     :return: (data, ground_truth_cov)
     """
@@ -82,6 +82,7 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
     :param nt:        Number of time steps
     :param ns:        Number of samples for each time step
     :param normalize: Whether to set Var[x] = 1
+    :param shuffle: Whether to shuffle to x_i's
     :return: (data, ground_truth_cov)
     """
 
@@ -97,6 +98,15 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
             block_cov /= std.T
         sigma[i * b:(i + 1) * b, i * b:(i + 1) * b] = block_cov
 
+    if shuffle:
+        perm = range(nv)
+        random.shuffle(perm)
+        sigma_perm = np.zeros((nv, nv))
+        for i in range(nv):
+            for j in range(nv):
+                sigma_perm[i, j] = sigma[perm[i], perm[j]]
+        sigma = sigma_perm
+
     def generate_single():
         myu = np.zeros((nv,))
         return np.random.multivariate_normal(myu, sigma)
@@ -107,6 +117,22 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
 
 def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
                        min_var=0.25, max_var=4.0, nglf=True, shuffle=False):
+    """ Generate data for the synthetic experiment with sudden change.
+
+    :param nv:         Number of observed variables
+    :param m:          Number of latent factors
+    :param nt:         Number of time steps
+    :param train_cnt:  Number of train samples
+    :param val_cnt:    Number of validation samples
+    :param test_cnt:   Number of test samples
+    :param snr:        Signal to noise ratio
+    :param min_var:    Minimum variance of x_i
+    :param max_var:    Maximum variance of x_i
+    :param nglf:       Whether to use NGLF model
+    :param shuffle:    Whether to shuffle to x_i's
+    :return: (train_data, val_data, test_data, ground_truth_covs)
+    """
+
     random.seed(42)
     np.random.seed(42)
 
@@ -137,15 +163,15 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
 
 
 def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
-    """ Generates smooth changing NGLF data.
+    """ Generates data for the synthetic experiment with smooth varying NGLF model.
 
     :param nv:      Number of observed variables
     :param m:       Number of latent factors
     :param nt:      Number of time steps
     :param ns:      Number of test samples for each time step
-    :param snr:     Signal to noise ratio.
-    :param min_var: Minimum variance of x_i.
-    :param max_var: Maximum variance of x_i.
+    :param snr:     Signal to noise ratio
+    :param min_var: Minimum variance of x_i
+    :param max_var: Maximum variance of x_i
     :return: (data, ground_truth_cov)
     """
     random.seed(42)
@@ -352,3 +378,5 @@ def load_stock_data_forecasting(nv, train_cnt, val_cnt, test_cnt, data_type='sto
     print('\ttest  shape:', test_data.shape)
 
     return train_data, val_data, test_data
+
+# TODO: finalize loading stock data and write down a short documentation

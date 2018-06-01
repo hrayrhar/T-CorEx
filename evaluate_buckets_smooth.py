@@ -148,6 +148,13 @@ def main():
             'tol': 1e-6,
             'msg': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100  # NOTE: tried 500, no improvement
+        }),
+
+        (baselines.BigQUIC(name='BigQUIC'), {
+            'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
+            'tol': 1e-3,
+            'verbose': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'max_iter': 100  # NOTE: tried 500, no improvement
         })
     ]
 

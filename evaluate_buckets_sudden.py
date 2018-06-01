@@ -153,7 +153,14 @@ def main():
         (baselines.QUIC(name='QUIC'), {
             'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
             'tol': 1e-6,
-            'msg': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'msg': 1,        # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'max_iter': 100  # NOTE: tried 500, no improvement
+        }),
+
+        (baselines.BigQUIC(name='BigQUIC'), {
+            'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
+            'tol': 1e-3,
+            'verbose': 1,    # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100  # NOTE: tried 500, no improvement
         })
     ]
@@ -166,7 +173,7 @@ def main():
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[:]:
+    for (method, params) in methods[-1:]:
         name = method.name
         best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
         results[name] = {}
