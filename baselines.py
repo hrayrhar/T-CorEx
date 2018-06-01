@@ -409,6 +409,39 @@ class QUIC(Baseline):
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return covs, None
 
+    def timeit(self, train_data, params):
+        # create exp_id.m file to execute QUIC
+        exp_id = random.randint(0, 2 ** 64)
+        with open('{}.m'.format(exp_id), 'w') as f:
+            f.write("cd QUIC;\n")
+            f.write("mex -llapack QUIC.C QUIC-mex.C;\n")
+            f.write("load('../{}.in.mat');\n".format(exp_id))
+            f.write("[X W opt cputime iter dGap] = QUIC('default', sample_cov, lamb, tol, msg, max_iter);\n")
+            f.write("save('-mat', '../{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
+            f.write("cd ..;\n")
+
+        start_time = time.time()
+        for X in train_data:
+            # create exp_id.in.mat file
+            savemat('{}.in.mat'.format(exp_id), {
+                'sample_cov': np.dot(X.T, X) / X.shape[0],
+                'lamb': np.float(params['lamb']),
+                'max_iter': params['max_iter'],
+                'tol': params['tol'],
+                'msg': params['msg']
+            })
+
+            # run created exp_id.m file and wait
+            process = Popen(['octave', '{}.m'.format(exp_id)], stdout=PIPE, stderr=PIPE)
+            process.wait()
+
+        # delete files
+        os.remove('{}.in.mat'.format(exp_id))
+        os.remove('{}.out.mat'.format(exp_id))
+        os.remove('{}.m'.format(exp_id))
+
+        return time.time() - start_time
+
 
 class BigQUIC(Baseline):
     def __init__(self, **kwargs):
@@ -473,3 +506,37 @@ class BigQUIC(Baseline):
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return covs, None
+
+    def timeit(self, train_data, params):
+        start_time = time.time()
+        exp_id = random.randint(0, 2 ** 64)
+        for X in train_data:
+            # create exp_id.in.txt file
+            with open('{}.in.txt'.format(exp_id), 'w') as f:
+                f.write('{} {}\n'.format(X.shape[1], X.shape[0]))
+                for x in X:
+                    f.write(' '.join(['{:.9f}'.format(t) for t in x]) + '\n')
+
+            # build exp_id.sh file
+            with open('{}.sh'.format(exp_id), 'w') as f:
+                f.write('cd BigQUIC_release/bigquic/;\n')
+                f.write('./bigquic-run -l {} -t {} -q {} -e {} ../../{}.in.txt ../../{}.out.txt;\n'.format(
+                    params['lamb'],
+                    params['max_iter'],
+                    params['verbose'],
+                    params['tol'],
+                    exp_id,
+                    exp_id
+                ))
+                f.write('cd ../../\n')
+
+            # run created exp_id.m file and wait
+            process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
+            process.wait()
+
+        # delete files
+        os.remove('{}.in.txt'.format(exp_id))
+        os.remove('{}.out.txt'.format(exp_id))
+        os.remove('{}.sh'.format(exp_id))
+
+        return time.time() - start_time
