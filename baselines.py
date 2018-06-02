@@ -205,6 +205,40 @@ class PCA(Baseline):
         return covs, None
 
 
+class SparsePCA(Baseline):
+    def __init__(self, **kwargs):
+        super(SparsePCA, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+        try:
+            covs = []
+            for x in train_data:
+                est = sk_dec.SparsePCA(n_components=params['n_components'],
+                                       alpha=params['alpha'],
+                                       ridge_alpha=params['ridge_alpha'])
+                est.fit(x)
+
+                # get covariance: \Psi + \Lambda.T * \Sigma_{zz} * \Lambda
+                z = est.transform(x)
+                cov_z = np.cov(z.T)
+                var_x = np.var(x, axis=0)
+                cov = np.dot(est.components_.T, np.dot(cov_z, est.components_))
+                np.fill_diagonal(cov, var_x)
+
+                covs.append(cov)
+        except Exception as e:
+            covs = None
+            if verbose:
+                print("\t{} failed with message: {}".format(self.name, e.message))
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return covs, None
+
+
 class FactorAnalysis(Baseline):
     def __init__(self, **kwargs):
         super(FactorAnalysis, self).__init__(**kwargs)
@@ -533,6 +567,8 @@ class BigQUIC(Baseline):
             # run created exp_id.m file and wait
             process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
             process.wait()
+            # stdout, stderr = process.communicate()
+            # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
 
         # delete files
         os.remove('{}.in.txt'.format(exp_id))
