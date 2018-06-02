@@ -218,7 +218,9 @@ class SparsePCA(Baseline):
             for x in train_data:
                 est = sk_dec.SparsePCA(n_components=params['n_components'],
                                        alpha=params['alpha'],
-                                       ridge_alpha=params['ridge_alpha'])
+                                       ridge_alpha=params['ridge_alpha'],
+                                       max_iter=params['max_ier'],
+                                       tol=params['tol'])
                 est.fit(x)
 
                 # get covariance: \Psi + \Lambda.T * \Sigma_{zz} * \Lambda

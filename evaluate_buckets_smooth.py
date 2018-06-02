@@ -65,7 +65,9 @@ def main():
         (baselines.SparsePCA(name='SparsePCA'), {
             'n_components': [args.m],
             'alpha': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0],
-            'ridge_alpha': [0.01]
+            'ridge_alpha': [0.01],
+            'tol': 1e-6,
+            'max_iter': 500,
         }),
 
         (baselines.FactorAnalysis(name='Factor Analysis'), {'n_components': [args.m]}),
