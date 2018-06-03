@@ -12,17 +12,18 @@ import sklearn.covariance as skcov
 import pickle as pkl
 
 
-def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=False):
+def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=False, from_matrix=True):
     """ Generates data according to an NGLF model.
 
-    :param nv:      Number of observed variables
-    :param m:       Number of latent factors
-    :param nt:      Number of time steps
-    :param ns:      Number of samples for each time step
-    :param snr:     Signal to noise ratio
-    :param min_var: Minimum variance of x_i
-    :param max_var: Maximum variance of x_i
-    :param shuffle: Whether to shuffle to x_i's
+    :param nv:          Number of observed variables
+    :param m:           Number of latent factors
+    :param nt:          Number of time steps
+    :param ns:          Number of samples for each time step
+    :param snr:         Signal to noise ratio
+    :param min_var:     Minimum variance of x_i
+    :param max_var:     Maximum variance of x_i
+    :param shuffle:     Whether to shuffle to x_i's
+    :param from_matrix: Whether to construct and return ground truth covariance matrices
     :return: (data, ground_truth_cov)
     """
 
@@ -41,37 +42,39 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=Fal
     cor = cor_signs * mean_rho
     print("Fixed SNR: {}".format(snr))
 
-    # Construct the ground truth covariance matrix of x
-    ground_truth = np.zeros((nv, nv))
-    for i in range(nv):
-        for j in range(nv):
-            if par[i] != par[j]:
-                continue
-            if i == j:
-                ground_truth[i][j] = x_std[i] ** 2
-            else:
-                ground_truth[i][j] = x_std[i] * cor[i] * x_std[j] * cor[j]
-
-    # Generate Data
-
-    """
-    # generates following the probabilistic graphical model
-    def generate_single():
-        z = [np.random.normal(0.0, v) for v in z_std]
-        x = np.zeros((nv,))
+    # Generate data
+    if from_matrix:
+        # construct the ground truth covariance matrix of x
+        ground_truth = np.zeros((nv, nv))
         for i in range(nv):
-            cond_mean = cor[i] * x_std[i] * z[par[i]]
-            cond_var = x_std[i] ** 2 * (1 - cor[i] ** 2)
-            x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
-        return x
-    """
+            for j in range(nv):
+                if par[i] != par[j]:
+                    continue
+                if i == j:
+                    ground_truth[i][j] = x_std[i] ** 2
+                else:
+                    ground_truth[i][j] = x_std[i] * cor[i] * x_std[j] * cor[j]
 
-    def generate_single():
-        myu = np.zeros((nv,))
-        return np.random.multivariate_normal(myu, ground_truth)
+        def generate_single():
+            myu = np.zeros((nv,))
+            return np.random.multivariate_normal(myu, ground_truth)
 
-    return ([np.array([generate_single() for i in range(ns)])
-             for t in range(nt)], ground_truth)
+        data = [np.array([generate_single() for i in range(ns)]) for t in range(nt)]
+        return data, ground_truth
+
+    else:
+        # generates following the probabilistic graphical model
+        def generate_single():
+            z = np.random.normal(0.0, 1.0, size=(m,))
+            x = np.zeros((nv,))
+            for i in range(nv):
+                cond_mean = cor[i] * x_std[i] * z[par[i]]
+                cond_var = x_std[i] ** 2 * (1 - cor[i] ** 2)
+                x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
+            return x
+
+        data = [np.array([generate_single() for i in range(ns)]) for t in range(nt)]
+        return data, None
 
 
 def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
@@ -116,20 +119,22 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
 
 
 def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
-                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False):
+                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False, from_matrix=True):
     """ Generate data for the synthetic experiment with sudden change.
 
-    :param nv:         Number of observed variables
-    :param m:          Number of latent factors
-    :param nt:         Number of time steps
-    :param train_cnt:  Number of train samples
-    :param val_cnt:    Number of validation samples
-    :param test_cnt:   Number of test samples
-    :param snr:        Signal to noise ratio
-    :param min_var:    Minimum variance of x_i
-    :param max_var:    Maximum variance of x_i
-    :param nglf:       Whether to use NGLF model
-    :param shuffle:    Whether to shuffle to x_i's
+    :param nv:          Number of observed variables
+    :param m:           Number of latent factors
+    :param nt:          Number of time steps
+    :param train_cnt:   Number of train samples
+    :param val_cnt:     Number of validation samples
+    :param test_cnt:    Number of test samples
+    :param snr:         Signal to noise ratio
+    :param min_var:     Minimum variance of x_i
+    :param max_var:     Maximum variance of x_i
+    :param nglf:        Whether to use NGLF model
+    :param shuffle:     Whether to shuffle to x_i's
+    :param from_matrix: Whether to construct and return ground truth covariance matrices
+                        Valid only when nglf=True
     :return: (train_data, val_data, test_data, ground_truth_covs)
     """
 
@@ -138,12 +143,14 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
 
     if nglf:
         (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle,
+                                        from_matrix=from_matrix)
         # make sure the second generated matrix will be the same no matter of train_cnt
         random.seed(77)
         np.random.seed(77)
         (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle)
+                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle,
+                                        from_matrix=from_matrix)
     else:
         (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
                                                     shuffle=shuffle)

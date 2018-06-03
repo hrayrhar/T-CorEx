@@ -219,7 +219,7 @@ class SparsePCA(Baseline):
                 est = sk_dec.SparsePCA(n_components=params['n_components'],
                                        alpha=params['alpha'],
                                        ridge_alpha=params['ridge_alpha'],
-                                       max_iter=params['max_ier'],
+                                       max_iter=params['max_iter'],
                                        tol=params['tol'])
                 est.fit(x)
 
@@ -392,6 +392,14 @@ class TCorex(Baseline):
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return covs, c
+
+    def timeit(self, train_data, params):
+        start_time = time.time()
+        params['nt'] = len(train_data)
+        c = self.tcorex(**params)
+        c.fit(train_data)
+        finish_time = time.time()
+        return finish_time - start_time
 
 
 class QUIC(Baseline):
