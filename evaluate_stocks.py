@@ -48,7 +48,7 @@ def main():
         (baselines.PCA(name='PCA'), {'n_components': nhidden_grid}),
 
         (baselines.SparsePCA(name='SparsePCA'), {
-            'n_components': [args.m],
+            'n_components': nhidden_grid,
             'alpha': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0],
             'ridge_alpha': [0.01],
             'tol': 1e-6,
@@ -125,7 +125,7 @@ def main():
 
         (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
             'nv': args.nv,
-            'n_hidden': [args.m],
+            'n_hidden': nhidden_grid,
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
@@ -133,7 +133,7 @@ def main():
                 'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
                 'l2': [],
             },
-            'gamma': tcorex_gamma_range,
+            'gamma': tcorex_gamma_grid,
             'reg_type': 'W',
             'init': False
         }),
