@@ -47,6 +47,14 @@ def main():
 
         (baselines.PCA(name='PCA'), {'n_components': nhidden_grid}),
 
+        (baselines.SparsePCA(name='SparsePCA'), {
+            'n_components': [args.m],
+            'alpha': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0],
+            'ridge_alpha': [0.01],
+            'tol': 1e-6,
+            'max_iter': 500,
+        }),
+
         (baselines.FactorAnalysis(name='Factor Analysis'), {'n_components': nhidden_grid}),
 
         (baselines.LinearCorex(name='Linear CorEx (applied bucket-wise)'), {
@@ -113,6 +121,35 @@ def main():
             'gamma': tcorex_gamma_grid,
             'reg_type': 'W',
             'init': True
+        }),
+
+        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'reg_params': {
+                # 'l1': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+                'l2': [],
+            },
+            'gamma': tcorex_gamma_range,
+            'reg_type': 'W',
+            'init': False
+        }),
+
+        (baselines.QUIC(name='QUIC'), {
+            'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
+            'tol': 1e-6,
+            'msg': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'max_iter': 100  # NOTE: tried 500, no improvement
+        }),
+
+        (baselines.BigQUIC(name='BigQUIC'), {
+            'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
+            'tol': 1e-3,
+            'verbose': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'max_iter': 100  # NOTE: tried 500, no improvement
         })
     ]
 
