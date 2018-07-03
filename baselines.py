@@ -129,14 +129,15 @@ class GroundTruth(Baseline):
 
 
 class Diagonal(Baseline):
-    def __init__(self, **kwargs):
+    def __init__(self, min_var=1e-6, **kwargs):
         super(Diagonal, self).__init__(**kwargs)
+        self.min_var = min_var
 
     def _train(self, train_data, params, verbose):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
-        covs = [np.diag(np.var(x, axis=0)) for x in train_data]
+        covs = [np.diag(np.maximum(np.var(x, axis=0), self.min_var)) for x in train_data]
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
