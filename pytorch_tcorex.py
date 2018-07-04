@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import norm, rankdata
 import time
 import random
-import theano_linear_corex
+import theano_time_corex
 import linearcorex
 
 import torch
@@ -557,11 +557,11 @@ class TCorexWeights(TCorexBase):
             if self.verbose:
                 print("Initializing with weights of a linear CorEx learned on whole data")
             init_start = time.time()
-            lin_corex = theano_linear_corex.Corex(nv=self.nv,
-                                                  n_hidden=self.m,
-                                                  max_iter=self.max_iter,
-                                                  anneal=self.anneal,
-                                                  verbose=self.verbose)
+            lin_corex = theano_time_corex.Corex(nv=self.nv,
+                                                n_hidden=self.m,
+                                                max_iter=self.max_iter,
+                                                anneal=self.anneal,
+                                                verbose=self.verbose)
             # take maximum self.max_sample_cnt samples
             data_concat = np.concatenate(x, axis=0)
             if data_concat.shape[0] > self.max_sample_count:
