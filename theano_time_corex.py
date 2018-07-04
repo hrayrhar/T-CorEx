@@ -12,8 +12,6 @@ import time
 import random
 
 import lasagne
-import linearcorex
-
 
 import gc
 
@@ -101,21 +99,21 @@ class Corex:
         self.z_mean = T.dot(self.x, self.ws.T)
         self.z = self.z_mean + self.z_noise
 
-        EPS = 1e-6
+        epsilon = 1e-6
 
         z2 = (self.z ** 2).mean(axis=0)  # (m,)
         R = T.dot(self.z.T, self.x) / ns  # m, nv
         R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
-        ri = ((R ** 2) / T.clip(1 - R ** 2, EPS, 1 - EPS)).sum(axis=0)  # (nv,)
+        ri = ((R ** 2) / T.clip(1 - R ** 2, epsilon, 1 - epsilon)).sum(axis=0)  # (nv,)
 
         # v_xi | z conditional mean
         outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-        inner_term_1 = (R / T.clip(1 - R ** 2, EPS, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
+        inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
         inner_term_2 = self.z.reshape((ns, self.m, 1))
         cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
 
         # objective
-        obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), EPS, np.inf)).sum(axis=0)
+        obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), epsilon, np.inf)).sum(axis=0)
         obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
         reg_obj = T.constant(0)
         if self.l1 > 0:
