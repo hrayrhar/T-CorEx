@@ -108,9 +108,9 @@ class Corex:
 
         # v_xi | z conditional mean
         outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-        inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
-        inner_term_2 = self.z.reshape((ns, self.m, 1))
-        cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+        inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+        inner_term_2 = self.z  # (ns, m)
+        cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
         # objective
         obj_part_1 = 0.5 * T.log(T.clip(((self.x - cond_mean) ** 2).mean(axis=0), epsilon, np.inf)).sum(axis=0)
@@ -139,6 +139,7 @@ class Corex:
             anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
 
         for i_eps, eps in enumerate(anneal_schedule):
+            start_time = time.time()
             self.eps = eps
             if i_eps > 0:
                 old_ws = self.ws.get_value()
@@ -158,6 +159,7 @@ class Corex:
                     self._update_u(x)
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
 
+            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
 
@@ -696,10 +698,9 @@ class TCorex(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)
@@ -803,11 +804,10 @@ class TCorexPrior1(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)
@@ -950,11 +950,10 @@ class TCorexPrior2(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)
@@ -1106,11 +1105,10 @@ class TCorexPrior2Weights(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)
@@ -1281,12 +1279,11 @@ class TCorexWeights(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
             # TODO: try write the loss function using all samples
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix
             # NOTE: even if we don't need explicitly compute sigma, the lines below will not increase running time
@@ -1459,10 +1456,9 @@ class TCorexWeightedObjective(TCorexWeights):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
-            inner_term_2 = z.reshape((ns_tot, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(axis=1))  # (ns_tot, nv)
+            inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+            inner_term_2 = z  # (ns_tot, m)
+            cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns_tot, nv)
 
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
             self.sigma[t] = T.dot(inner_mat.T, inner_mat)

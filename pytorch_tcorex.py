@@ -114,9 +114,9 @@ class Corex:
 
         # v_xi | z conditional mean
         outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-        inner_term_1 = (R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))).reshape((1, self.m, self.nv))
-        inner_term_2 = z.reshape((ns, self.m, 1))
-        cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(dim=1))  # (ns, nv)
+        inner_term_1 = R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+        inner_term_2 = z  # (ns, m)
+        cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
         # objective
         obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(dim=0)
@@ -142,6 +142,7 @@ class Corex:
         optimizer = torch.optim.Adam([self.ws])
 
         for i_eps, eps in enumerate(anneal_schedule):
+            start_time = time.time()
             self.eps = eps
             self.moments = self._calculate_moments(x, self.weights, quick=True)
             self._update_u(x)
@@ -163,6 +164,7 @@ class Corex:
                     self.moments = self._calculate_moments(x, self.weights, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
+            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
 
         self.moments = self._calculate_moments(x, self.weights, quick=False)  # Update moments with details
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
@@ -756,14 +758,13 @@ class TCorexWeights(TCorexBase):
 
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
-            inner_term_1 = (R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))).reshape(
-                (1, self.m, self.nv))
+            inner_term_1 = R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            inner_term_2 = self.z[t].reshape((ns, self.m, 1))
-            cond_mean = outer_term * ((inner_term_1 * inner_term_2).sum(dim=1))  # (ns, nv)
+            inner_term_2 = self.z[t]  # (ns, m)
+            cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix
-            # NOTE: even if we don't need explicitly compute sigma, the lines below will not increase running time
+            # TODO: don't calculate this if nv is very large
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
             self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
             identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
@@ -859,14 +860,15 @@ class TCorexWeights(TCorexBase):
                               n_hidden=self.m,
                               max_iter=self.max_iter,
                               anneal=self.anneal,
-                              verbose=self.verbose)
+                              verbose=self.verbose,
+                              torch_device=self.torch_device)
             # take maximum self.max_sample_cnt samples
             data_concat = np.concatenate(x, axis=0)
             if data_concat.shape[0] > self.max_sample_count:
                 random.shuffle(data_concat)
                 data_concat = data_concat[:self.max_sample_count]
             lin_corex.fit(data_concat)
-            self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
+            self.pretrained_weights = [lin_corex.weights] * self.nt
             if self.verbose:
                 print("Initialization took {:.2f} seconds".format(time.time() - init_start))
 
