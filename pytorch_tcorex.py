@@ -392,7 +392,7 @@ class TCorexBase(object):
         self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
-    def forward(self, x_wno, anneal_eps):
+    def forward(self, x_wno, anneal_eps, calc_sigma=False):
         raise NotImplementedError("forward function should be specified for all child classes")
 
     def _train_loop(self, x):
@@ -671,7 +671,7 @@ class TCorexBase(object):
     """
 
     def get_covariance(self):
-        norm_cov = self.forward(self.x_std, anneal_eps=0)['sigma']
+        norm_cov = self.forward(self.x_std, anneal_eps=0, calc_sigma=True)['sigma']
         if self.device.type == 'cpu':
             norm_cov = [sigma_t.data.numpy() for sigma_t in norm_cov]
         else:
@@ -708,7 +708,7 @@ class TCorexWeights(TCorexBase):
             self.ws.append(wt)
         self.transfer_weights()
 
-    def forward(self, x_wno, anneal_eps):
+    def forward(self, x_wno, anneal_eps, calc_sigma=False):
         x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
         anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
 
@@ -766,12 +766,12 @@ class TCorexWeights(TCorexBase):
             inner_term_2 = self.z[t]  # (ns, m)
             cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
-            # calculate normed covariance matrix
-            # TODO: don't calculate this if nv is very large
-            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
-            self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
-            identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
-            self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
+            # calculate normed covariance matrix if needed
+            if calc_sigma or self.reg_type == 'Sigma':
+                inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
+                self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
+                identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
+                self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
             obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x[t] - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
