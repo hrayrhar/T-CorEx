@@ -861,7 +861,7 @@ class TCorexPrior1(TCorexBase):
         # fit a linear corex to get the priors
         lin_corex = Corex(nv=self.nv,
                           n_hidden=self.m,
-                          max_iter=500,
+                          max_iter=self.max_iter,
                           anneal=True,
                           verbose=self.verbose)
         lin_corex.fit(np.concatenate(x, axis=0))
@@ -1007,7 +1007,7 @@ class TCorexPrior2(TCorexBase):
         # fit a linear corex to get the priors
         lin_corex = Corex(nv=self.nv,
                           n_hidden=self.m,
-                          max_iter=500,
+                          max_iter=self.max_iter,
                           anneal=True,
                           verbose=self.verbose)
         lin_corex.fit(np.concatenate(x, axis=0))
@@ -1195,7 +1195,7 @@ class TCorexPrior2Weights(TCorexBase):
         if self.init:
             lin_corex = Corex(nv=self.nv,
                               n_hidden=self.m,
-                              max_iter=500,
+                              max_iter=self.max_iter,
                               anneal=True,
                               verbose=self.verbose)
             lin_corex.fit(np.concatenate(x, axis=0))

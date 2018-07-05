@@ -8,6 +8,7 @@ import time
 import random
 
 import torch
+
 dtype = torch.float
 
 import gc
@@ -82,10 +83,11 @@ class Corex:
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
         self.history = {}  # Keep track of values for each iteration
+        self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
         # define the weights of the model
-        self.ws = np.random.normal(loc=0, scale=1.0/np.sqrt(self.nv), size=(self.m, self.nv))
+        self.ws = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
         self.ws = torch.tensor(self.ws, dtype=dtype, device=self.device, requires_grad=True)
         self.transfer_weights()
 
@@ -387,6 +389,7 @@ class TCorexBase(object):
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
         self.history = [{} for t in range(self.nt)]  # Keep track of values for each iteration
+        self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
     def forward(self, x_wno, anneal_eps):
@@ -681,7 +684,7 @@ class TCorexBase(object):
 
 class TCorexWeights(TCorexBase):
     def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=2,
-                 max_sample_cnt=2**30, **kwargs):
+                 max_sample_cnt=2 ** 30, **kwargs):
         """
         :param gamma: parameter that controls the decay of weights.
                       weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
@@ -700,7 +703,7 @@ class TCorexWeights(TCorexBase):
         # define the weights of the model
         self.ws = []
         for t in range(self.nt):
-            wt = np.random.normal(loc=0, scale=1.0/np.sqrt(self.nv), size=(self.m, self.nv))
+            wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
             wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
             self.ws.append(wt)
         self.transfer_weights()
@@ -725,19 +728,19 @@ class TCorexWeights(TCorexBase):
         mi_xz = [None] * self.nt
 
         for t in range(self.nt):
-            ns = x_wno[t].shape[0]
-            weights = []
             l = max(0, t - self.window_len[t])
             r = min(self.nt, t + self.window_len[t] + 1)
-            x_all = []
+
+            weights = []
             for i in range(l, r):
                 cur_ns = x_wno[i].shape[0]
-                weights.append(torch.ones(cur_ns, dtype=dtype, device=self.device) / np.power(self.gamma, np.abs(i - t)))
-                x_all.append(self.x[i])
+                cur_sample_w = np.ones((cur_ns,)) / np.power(self.gamma, np.abs(i - t))
+                weights.append(torch.tensor(cur_sample_w, dtype=dtype, device=self.device))
             weights = torch.cat(weights, dim=0)
             weights = weights / torch.sum(weights)
             weights = weights.reshape((-1, 1))
-            x_all = torch.cat(x_all, dim=0)
+
+            x_all = torch.cat(self.x[l:r], dim=0)
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())
@@ -771,7 +774,8 @@ class TCorexWeights(TCorexBase):
             self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
-            obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x[t] - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(dim=0)
+            obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x[t] - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
+                dim=0)
             obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
             self.objs[t] = obj_part_1 + obj_part_2
 
@@ -802,10 +806,10 @@ class TCorexWeights(TCorexBase):
         self.total_obj = self.main_obj + self.reg_obj
 
         return {'total_obj': self.total_obj,
-                'main_obj':  self.main_obj,
-                'reg_obj':   self.reg_obj,
-                'objs':      self.objs,
-                'sigma':     self.sigma}
+                'main_obj': self.main_obj,
+                'reg_obj': self.reg_obj,
+                'objs': self.objs,
+                'sigma': self.sigma}
 
     def fit(self, x):
         # Compute the window lengths for each time step and define the model
