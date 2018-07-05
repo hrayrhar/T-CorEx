@@ -168,9 +168,8 @@ class Corex:
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
             print("Annealing iteration finished, time = {}".format(time.time() - start_time))
 
-        self.moments = self._calculate_moments(x, self.weights, quick=False)  # Update moments with details
+        self.moments = self._calculate_moments(x, self.weights, quick=False)
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
-
         self.weights = self.weights[order]
         self.ws.data = torch.tensor(self.weights, dtype=dtype, device=self.device)
         self._update_u(x)

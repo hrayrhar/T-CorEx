@@ -89,7 +89,6 @@ class Corex:
         self.rng = RandomStreams(seed)
 
     def _define_model(self, anneal_eps):
-
         self.x_wno = T.matrix('X')
         ns = self.x_wno.shape[0]
         self.anneal_noise = self.rng.normal(size=(ns, self.nv))
@@ -100,7 +99,6 @@ class Corex:
         self.z = self.z_mean + self.z_noise
 
         epsilon = 1e-6
-
         z2 = (self.z ** 2).mean(axis=0)  # (m,)
         R = T.dot(self.z.T, self.x) / ns  # m, nv
         R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
@@ -152,6 +150,10 @@ class Corex:
             self._update_u(x)
 
             for i_loop in range(self.max_iter):
+                # TODO: write a stopping condition
+                if self.verbose:
+                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter))
+
                 (obj, _) = self.train_step(x.astype(np.float32))
 
                 if self.verbose and i_loop % 15 == 0:
@@ -160,14 +162,13 @@ class Corex:
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
 
             print("Annealing iteration finished, time = {}".format(time.time() - start_time))
-        self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments with details
-        order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
 
+        self.moments = self._calculate_moments(x, self.ws, quick=False)
+        order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
         ws = self.ws.get_value()
         ws = ws[order]
         self.ws.set_value(ws)
         self._update_u(x)
-
         self.moments = self._calculate_moments(x, self.ws, quick=False)  # Update moments based on sorted weights.
         return self
 
@@ -1206,7 +1207,7 @@ class TCorexPrior2Weights(TCorexBase):
 
 class TCorexWeights(TCorexBase):
     def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=2,
-                 max_sample_cnt=2**30, **kwargs):
+                 max_sample_cnt=2 ** 30, **kwargs):
         """
         :param gamma: parameter that controls the decay of weights.
                       weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
@@ -1246,7 +1247,6 @@ class TCorexWeights(TCorexBase):
         mi_xz = [None] * self.nt
 
         for t in range(self.nt):
-            ns = self.x_wno[t].shape[0]
             weights = []
             l = max(0, t - self.window_len[t])
             r = min(self.nt, t + self.window_len[t] + 1)
@@ -1281,7 +1281,6 @@ class TCorexWeights(TCorexBase):
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
             inner_term_1 = R / T.clip(1 - R ** 2, epsilon, 1) / T.sqrt(z2).reshape((self.m, 1))  # (m, nv)
             # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            # TODO: try write the loss function using all samples
             inner_term_2 = self.z[t]  # (ns, m)
             cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
@@ -1465,7 +1464,8 @@ class TCorexWeightedObjective(TCorexWeights):
             self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
 
             # objective
-            obj_part_1 = 0.5 * T.log(T.clip((((x_all - cond_mean) ** 2) * weights).mean(axis=0), epsilon, np.inf)).sum(axis=0)
+            obj_part_1 = 0.5 * T.log(T.clip((((x_all - cond_mean) ** 2) * weights).mean(axis=0), epsilon, np.inf)).sum(
+                axis=0)
             obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
             self.objs[t] = obj_part_1 + obj_part_2
 
