@@ -109,7 +109,7 @@ class Corex:
         z_mean = torch.mm(x, self.ws.t())
         z = z_mean + z_noise
 
-        epsilon = 1e-6
+        epsilon = 1e-8
         z2 = (z ** 2).mean(dim=0)  # (m,)
         R = torch.mm(z.t(), x) / ns  # m, nv
         R = R / torch.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
@@ -724,7 +724,7 @@ class TCorexWeights(TCorexBase):
             z_mean = torch.mm(self.x[t], self.ws[t].t())
             self.z[t] = z_mean + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt

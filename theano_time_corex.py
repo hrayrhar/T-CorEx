@@ -99,7 +99,7 @@ class Corex:
         self.z_mean = T.dot(self.x, self.ws.T)
         self.z = self.z_mean + self.z_noise
 
-        epsilon = 1e-6
+        epsilon = 1e-8
         z2 = (self.z ** 2).mean(axis=0)  # (m,)
         R = T.dot(self.z.T, self.x) / ns  # m, nv
         R = R / T.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
@@ -685,7 +685,7 @@ class TCorex(TCorexBase):
             self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
             self.z[t] = self.z_mean[t] + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
@@ -779,7 +779,7 @@ class TCorexPrior1(TCorexBase):
             self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
             self.z[t] = self.z_mean[t] + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
@@ -920,7 +920,7 @@ class TCorexPrior2(TCorexBase):
             self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
             self.z[t] = self.z_mean[t] + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
@@ -1067,7 +1067,7 @@ class TCorexPrior2Weights(TCorexBase):
             self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
             self.z[t] = self.z_mean[t] + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
@@ -1243,7 +1243,7 @@ class TCorexWeights(TCorexBase):
             self.z_mean[t] = T.dot(self.x[t], self.ws[t].T)
             self.z[t] = self.z_mean[t] + z_noise
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
@@ -1425,7 +1425,7 @@ class TCorexWeightedObjective(TCorexWeights):
             self.x[t] = np.sqrt(1 - self.anneal_eps ** 2) * self.x_wno[t] + self.anneal_eps * anneal_noise
             self.ws[t] = theano.shared(1.0 / np.sqrt(self.nv) * np.random.randn(self.m, self.nv), name='W{}'.format(t))
 
-        epsilon = 1e-5
+        epsilon = 1e-8
         self.objs = [None] * self.nt
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
