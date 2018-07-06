@@ -59,7 +59,7 @@ def get_w_from_corex(corex):
 
 
 class Corex:
-    def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
+    def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None, update_iter=15,
                  gaussianize='standard', gpu=False, y_scale=1.0, l1=0.0, verbose=False, torch_device='cpu'):
 
         self.nv = nv  # Number of variables
@@ -69,6 +69,7 @@ class Corex:
         self.anneal = anneal
         self.eps = 0  # If anneal is True, it's adjusted during optimization to avoid local minima
         self.missing_values = missing_values
+        self.update_iter = update_iter  # Compute statistics every update_iter
 
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
         self.gpu = gpu  # Enable GPU support for some large matrix multiplications.
@@ -135,6 +136,7 @@ class Corex:
         x = np.asarray(x, dtype=np.float32)
         x = self.preprocess(x, fit=True)  # Fit a transform for each marginal
         assert x.shape[1] == self.nv
+        self.x_std = x  # to have access to the standardized version of input
 
         anneal_schedule = [0.]
         if self.anneal:
@@ -162,7 +164,7 @@ class Corex:
                 optimizer.step()
                 self.transfer_weights()
 
-                if self.verbose and i_loop % 15 == 0:
+                if self.verbose and i_loop % self.update_iter == 0:
                     self.moments = self._calculate_moments(x, self.weights, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
@@ -711,6 +713,7 @@ class TCorexWeights(TCorexBase):
         x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
         anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
 
+        # TODO: remove some variables from self for for better memory usage
         self.x = [None] * self.nt
         self.z = [None] * self.nt
         for t in range(self.nt):
