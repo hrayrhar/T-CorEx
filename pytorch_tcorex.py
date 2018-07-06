@@ -103,14 +103,14 @@ class Corex:
 
         ns = x_wno.shape[0]
         anneal_noise = torch.randn((ns, self.nv), dtype=dtype, device=self.device)
-        self.x = torch.sqrt(1 - anneal_eps ** 2) * x_wno + anneal_eps * anneal_noise
+        x = torch.sqrt(1 - anneal_eps ** 2) * x_wno + anneal_eps * anneal_noise
         z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
-        z_mean = torch.mm(self.x, self.ws.t())
+        z_mean = torch.mm(x, self.ws.t())
         z = z_mean + z_noise
 
         epsilon = 1e-6
         z2 = (z ** 2).mean(dim=0)  # (m,)
-        R = torch.mm(z.t(), self.x) / ns  # m, nv
+        R = torch.mm(z.t(), x) / ns  # m, nv
         R = R / torch.sqrt(z2).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
         ri = ((R ** 2) / torch.clamp(1 - R ** 2, epsilon, 1 - epsilon)).sum(dim=0)  # (nv,)
 
@@ -121,7 +121,7 @@ class Corex:
         cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
         # objective
-        obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(dim=0)
+        obj_part_1 = 0.5 * torch.log(torch.clamp(((x - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(dim=0)
         obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
         reg_obj = torch.tensor(0, dtype=dtype, device=self.device)
         if self.l1 > 0:
@@ -695,7 +695,7 @@ class TCorexWeights(TCorexBase):
         self.l2 = l2
         self.reg_type = reg_type
         self.init = init
-        self.gamma = gamma
+        self.gamma = np.float(gamma)
         self.max_sample_count = max_sample_cnt
         self.window_len = None  # this depends on x and will be computed in fit()
 
@@ -816,7 +816,7 @@ class TCorexWeights(TCorexBase):
         window_len = [0] * self.nt
         for i in range(self.nt):
             k = 0
-            while k <= self.nt and sum(n_samples[i - k:i + k + 1]) < self.max_sample_count:
+            while k <= self.nt and sum(n_samples[max(0, i - k):min(self.nt, i + k + 1)]) < self.max_sample_count:
                 k += 1
             window_len[i] = k
         self.window_len = window_len

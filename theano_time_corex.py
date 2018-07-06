@@ -1045,7 +1045,7 @@ class TCorexPrior2Weights(TCorexBase):
         self.reg_type = reg_type
         self.init = init
         self.lamb = lamb
-        self.gamma = gamma
+        self.gamma = np.float(gamma)
 
     def _define_model(self):
         self.x_wno = [None] * self.nt
@@ -1219,7 +1219,7 @@ class TCorexWeights(TCorexBase):
         self.l2 = l2
         self.reg_type = reg_type
         self.init = init
-        self.gamma = gamma
+        self.gamma = np.float(gamma)
         self.max_sample_count = max_sample_cnt
         self.window_len = None  # this depends on x and will be computed in fit()
 
@@ -1338,7 +1338,7 @@ class TCorexWeights(TCorexBase):
         window_len = [0] * self.nt
         for i in range(self.nt):
             k = 0
-            while k <= self.nt and sum(n_samples[i - k:i + k + 1]) < self.max_sample_count:
+            while k <= self.nt and sum(n_samples[max(0, i - k):min(self.nt, i + k + 1)]) < self.max_sample_count:
                 k += 1
             window_len[i] = k
         self.window_len = window_len
