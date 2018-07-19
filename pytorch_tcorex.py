@@ -90,6 +90,9 @@ class Corex:
         # define the weights of the model
         self.ws = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
         self.ws = torch.tensor(self.ws, dtype=dtype, device=self.device, requires_grad=True)
+        # TODO: decide whether to use orthogonal initialization; do it for T-CorEx too
+        # self.ws = torch.zeros((self.m, self.nv), dtype=dtype, device=self.device, requires_grad=True)
+        # self.ws = torch.nn.init.orthogonal_(self.ws, gain=1.0/np.sqrt(self.nv))
         self.transfer_weights()
 
     def transfer_weights(self):
@@ -154,7 +157,7 @@ class Corex:
             for i_loop in range(self.max_iter):
                 # TODO: write a stopping condition
                 if self.verbose:
-                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter))
+                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
 
                 ret = self.forward(x, eps)
                 obj = ret['obj']
@@ -164,7 +167,7 @@ class Corex:
                 optimizer.step()
                 self.transfer_weights()
 
-                if self.verbose and i_loop % self.update_iter == 0:
+                if self.verbose > 1 and i_loop % self.update_iter == 0:
                     self.moments = self._calculate_moments(x, self.weights, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
@@ -176,6 +179,11 @@ class Corex:
         self.ws.data = torch.tensor(self.weights, dtype=dtype, device=self.device)
         self._update_u(x)
         self.moments = self._calculate_moments(x, self.weights, quick=False)
+
+        # clear cache to free some GPU memory
+        if self.torch_device == 'cuda':
+            torch.cuda.empty_cache()
+
         return self
 
     def _update_u(self, x):
@@ -198,7 +206,7 @@ class Corex:
         return - 0.5 * np.log1p(-self.moments["rho"] ** 2)
 
     def clusters(self):
-        return np.argmax(np.abs(self.us), axis=0)  # TODO: understand this
+        return np.argmax(np.abs(self.us), axis=0)
 
     def _sig(self, x, u):
         """Multiple the matrix u by the covariance matrix of x. We are interested in situations where
@@ -423,7 +431,7 @@ class TCorexBase(object):
             for i_loop in range(self.max_iter):
                 # TODO: write a stopping condition
                 if self.verbose:
-                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter))
+                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
 
                 ret = self.forward(x, eps)
                 obj = ret['total_obj']
@@ -435,7 +443,7 @@ class TCorexBase(object):
 
                 main_obj = ret['main_obj']
                 reg_obj = ret['reg_obj']
-                if i_loop % self.update_iter == 0 and self.verbose:
+                if i_loop % self.update_iter == 0 and self.verbose > 1:
                     self.moments = self._calculate_moments(x, self.weights, quick=True)
                     self._update_u(x)
                     print("tc: {:.4f}, obj: {:.4f}, main: {:.4f}, reg: {:.4f}, eps: {:.4f}".format(
@@ -444,6 +452,11 @@ class TCorexBase(object):
 
         self.moments = self._calculate_moments(x, self.weights, quick=False)  # Update moments with details
         self._update_u(x)
+
+        # clear cache to free some GPU memory
+        if self.torch_device == 'cuda':
+            torch.cuda.empty_cache()
+
         return self
 
     def fit(self, x):
@@ -734,15 +747,21 @@ class TCorexWeights(TCorexBase):
             r = min(self.nt, t + self.window_len[t] + 1)
 
             weights = []
+            x_all = []
             for i in range(l, r):
                 cur_ns = x_wno[i].shape[0]
-                cur_sample_w = np.ones((cur_ns,)) / np.power(self.gamma, np.abs(i - t))
-                weights.append(torch.tensor(cur_sample_w, dtype=dtype, device=self.device))
+                coef = 1.0 / np.power(self.gamma, np.abs(i - t))
+                # skip if the importance is too low
+                if coef < 1e-6:
+                    continue
+                weights.append(torch.tensor(coef * np.ones((cur_ns,)), dtype=dtype, device=self.device))
+                x_all.append(self.x[i])
+
             weights = torch.cat(weights, dim=0)
             weights = weights / torch.sum(weights)
             weights = weights.reshape((-1, 1))
 
-            x_all = torch.cat(self.x[l:r], dim=0)
+            x_all = torch.cat(x_all, dim=0)
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())

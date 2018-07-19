@@ -154,11 +154,11 @@ class Corex:
             for i_loop in range(self.max_iter):
                 # TODO: write a stopping condition
                 if self.verbose:
-                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter))
+                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
 
                 (obj, _) = self.train_step(x.astype(np.float32))
 
-                if self.verbose and i_loop % self.update_iter == 0:
+                if self.verbose > 1 and i_loop % self.update_iter == 0:
                     self.moments = self._calculate_moments(x, self.ws, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, eps = {}".format(self.tc, obj, eps))
@@ -194,7 +194,7 @@ class Corex:
         return - 0.5 * np.log1p(-self.moments["rho"] ** 2)
 
     def clusters(self):
-        return np.argmax(np.abs(self.us), axis=0)  # TODO: understand this
+        return np.argmax(np.abs(self.us), axis=0)
 
     def _sig(self, x, u):
         """Multiple the matrix u by the covariance matrix of x. We are interested in situations where
@@ -416,11 +416,11 @@ class TCorexBase(object):
             self._update_u(x)
             for i_loop in range(self.max_iter):
                 if self.verbose:
-                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter))
+                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
                 ret = self.train_step(*x)
                 obj = ret[0]
                 reg_obj = ret[2]
-                if i_loop % self.update_iter == 0 and self.verbose:
+                if i_loop % self.update_iter == 0 and self.verbose > 1:
                     self.moments = self._calculate_moments(x, self.ws, quick=True)
                     self._update_u(x)
                     print("tc = {}, obj = {}, reg = {}, eps = {}".format(np.sum(self.tc),
@@ -1255,7 +1255,11 @@ class TCorexWeights(TCorexBase):
             x_all = []
             for i in range(l, r):
                 cur_ns = self.x_wno[i].shape[0]
-                weights.append(T.ones((cur_ns,)) / np.power(self.gamma, np.abs(i - t)))
+                coef = 1.0 / np.power(self.gamma, np.abs(i - t))
+                # skip if the importance is too low
+                if coef < 1e-6:
+                    continue
+                weights.append(coef * T.ones((cur_ns,)))
                 x_all.append(self.x[i])
             weights = T.concatenate(weights, axis=0)
             weights = weights / T.sum(weights)
