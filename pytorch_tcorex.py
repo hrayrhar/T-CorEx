@@ -96,7 +96,7 @@ class Corex:
         self.transfer_weights()
 
     def transfer_weights(self):
-        if self.device.type == 'cpu':
+        if self.torch_device == 'cpu':
             self.weights = self.ws.data.numpy()
         else:
             self.weights = self.ws.data.cpu().numpy()
@@ -360,14 +360,17 @@ class Corex:
     def predict(self, y):
         return self.invert(np.dot(self.moments["X_i Z_j"], y.T).T)
 
-    def get_covariance(self):
+    def get_covariance(self, normed=False):
         # This uses E(Xi|Y) formula for non-synergistic relationships
         m = self.moments
         z = m['rhoinvrho'] / (1 + m['Si'])
         cov = np.dot(z.T, z)
         cov /= (1. - self.eps ** 2)
         np.fill_diagonal(cov, 1)
-        return self.theta[1][:, np.newaxis] * self.theta[1] * cov
+        if normed:
+            return cov
+        else:
+            return self.theta[1][:, np.newaxis] * self.theta[1] * cov
 
 
 class TCorexBase(object):
@@ -401,7 +404,7 @@ class TCorexBase(object):
         self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
-    def forward(self, x_wno, anneal_eps, calc_sigma=False):
+    def forward(self, x_wno, anneal_eps, indices=None):
         raise NotImplementedError("forward function should be specified for all child classes")
 
     def _train_loop(self, x):
@@ -417,8 +420,10 @@ class TCorexBase(object):
 
         # initialize the weights if pre-trained weights are specified
         if self.pretrained_weights is not None:
-            for cur_w, pre_w in zip(self.ws, self.pretrained_weights):
-                cur_w.data = torch.tensor(pre_w, dtype=dtype, device=self.device)
+            self.ws = []
+            for pre_w in self.pretrained_weights:
+                self.ws.append(torch.tensor(pre_w, dtype=dtype, device=self.device, requires_grad=True))
+            self.transfer_weights()
 
         # set up the optimizer
         optimizer = torch.optim.Adam(self.ws)
@@ -466,7 +471,7 @@ class TCorexBase(object):
         return self._train_loop(x)
 
     def transfer_weights(self):
-        if self.device.type == 'cpu':
+        if self.torch_device == 'cpu':
             self.weights = [w.data.numpy() for w in self.ws]
         else:
             self.weights = [w.data.cpu().numpy() for w in self.ws]
@@ -684,16 +689,22 @@ class TCorexBase(object):
         return ret
     """
 
-    def get_covariance(self):
-        norm_cov = self.forward(self.x_std, anneal_eps=0, calc_sigma=True)['sigma']
-        if self.device.type == 'cpu':
-            norm_cov = [sigma_t.data.numpy() for sigma_t in norm_cov]
-        else:
-            norm_cov = [sigma_t.data.cpu().numpy() for sigma_t in norm_cov]
-        ret = [None] * self.nt
+    def get_covariance(self, indices=None, normed=False):
+        if indices is None:
+            indices = range(self.nt)
+        cov = self.forward(self.x_std, anneal_eps=0, indices=indices)['sigma']
         for t in range(self.nt):
-            ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * norm_cov[t]
-        return ret
+            if cov[t] is None:
+                continue
+            if self.torch_device == 'cpu':
+                cov[t] = cov[t].data.numpy()
+            else:
+                cov[t] = cov[t].data.cpu().numpy()
+            if not normed:
+                cov[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov[t]
+        if self.torch_device == 'cuda':
+            torch.cuda.empty_cache()
+        return cov
 
 
 class TCorexWeights(TCorexBase):
@@ -715,14 +726,15 @@ class TCorexWeights(TCorexBase):
         self.window_len = None  # this depends on x and will be computed in fit()
 
         # define the weights of the model
-        self.ws = []
-        for t in range(self.nt):
-            wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
-            wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
-            self.ws.append(wt)
-        self.transfer_weights()
+        if (not self.init) and (self.pretrained_weights is None):
+            self.ws = []
+            for t in range(self.nt):
+                wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
+                wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
+                self.ws.append(wt)
+            self.transfer_weights()
 
-    def forward(self, x_wno, anneal_eps, calc_sigma=False):
+    def forward(self, x_wno, anneal_eps, indices=None):
         x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
         anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
 
@@ -788,7 +800,7 @@ class TCorexWeights(TCorexBase):
             cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix if needed
-            if calc_sigma or self.reg_type == 'Sigma':
+            if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
                 inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
                 self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
                 identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
