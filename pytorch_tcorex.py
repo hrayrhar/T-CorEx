@@ -735,16 +735,18 @@ class TCorexWeights(TCorexBase):
             self.transfer_weights()
 
     def forward(self, x_wno, anneal_eps, indices=None):
-        x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
-        anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
+        # copy x_wno
+        x_wno = [xt.copy() for xt in x_wno]
+        # add annealing noise
+        for t in range(self.nt):
+            ns = x_wno[t].shape[0]
+            anneal_noise = np.random.normal(size=(ns, self.nv))
+            x_wno[t] = np.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
+        self.x = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
 
-        # TODO: remove some variables from self for for better memory usage
-        self.x = [None] * self.nt
         self.z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            anneal_noise = torch.randn((ns, self.nv), dtype=dtype, device=self.device)
-            self.x[t] = torch.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
             z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
             z_mean = torch.mm(self.x[t], self.ws[t].t())
             self.z[t] = z_mean + z_noise
@@ -754,26 +756,35 @@ class TCorexWeights(TCorexBase):
         self.sigma = [None] * self.nt
         mi_xz = [None] * self.nt
 
+        # store all concatenations here for better memory usage
+        concats = dict()
+
         for t in range(self.nt):
             l = max(0, t - self.window_len[t])
             r = min(self.nt, t + self.window_len[t] + 1)
-
             weights = []
-            x_all = []
+            left_t = t
+            right_t = t
             for i in range(l, r):
                 cur_ns = x_wno[i].shape[0]
                 coef = 1.0 / np.power(self.gamma, np.abs(i - t))
                 # skip if the importance is too low
                 if coef < 1e-6:
                     continue
+                left_t = min(left_t, i)
+                right_t = max(right_t, i)
                 weights.append(torch.tensor(coef * np.ones((cur_ns,)), dtype=dtype, device=self.device))
-                x_all.append(self.x[i])
 
             weights = torch.cat(weights, dim=0)
             weights = weights / torch.sum(weights)
             weights = weights.reshape((-1, 1))
 
-            x_all = torch.cat(x_all, dim=0)
+            t_range = (left_t, right_t)
+            if t_range in concats:
+                x_all = concats[t_range]
+            else:
+                x_all = torch.cat(self.x[left_t:right_t+1], dim=0)
+                concats[t_range] = x_all
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())
