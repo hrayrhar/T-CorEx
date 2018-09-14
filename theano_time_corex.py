@@ -13,16 +13,6 @@ import random
 
 import lasagne
 
-import gc
-
-try:
-    import cudamat as cm
-
-    GPU_SUPPORT = True
-except:
-    print("Install CUDA and cudamat (for python) to enable GPU speedups.")
-    GPU_SUPPORT = False
-
 
 def g(x, t=4):
     """A transformation that suppresses outliers for a standard normal."""
@@ -62,7 +52,7 @@ def get_w_from_corex(corex):
 
 class Corex:
     def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None, update_iter=15,
-                 gaussianize='standard', gpu=False, y_scale=1.0, l1=0.0, verbose=False, seed=None):
+                 gaussianize='standard', y_scale=1.0, l1=0.0, verbose=False, seed=None):
 
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
@@ -74,9 +64,6 @@ class Corex:
         self.update_iter = update_iter  # Compute statistics every update_iter
 
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
-        self.gpu = gpu  # Enable GPU support for some large matrix multiplications.
-        if self.gpu:
-            cm.cublas_init()
 
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
         np.random.seed(seed)  # Set seed for deterministic results
@@ -200,19 +187,8 @@ class Corex:
         """Multiple the matrix u by the covariance matrix of x. We are interested in situations where
         n_variables >> n_samples, so we do this without explicitly constructing the covariance matrix."""
         n_samples = x.shape[0]
-        if self.gpu:
-            y = cm.empty((n_samples, self.m))
-            uc = cm.CUDAMatrix(u)
-            cm.dot(x, uc.T, target=y)
-            del uc
-            tmp = cm.empty((self.nv, self.m))
-            cm.dot(x.T, y, target=tmp)
-            tmp_dot = tmp.asarray()
-            del y
-            del tmp
-        else:
-            y = x.dot(u.T)
-            tmp_dot = x.T.dot(y)
+        y = x.dot(u.T)
+        tmp_dot = x.T.dot(y)
         prod = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * u  # nv by m,  <X_i Y_j> / std Y_j
         return prod
 
@@ -237,29 +213,15 @@ class Corex:
         the value of the objective. Note it is assumed that <X_i^2> = 1! """
         n_samples = x.shape[0]
         m = {}  # Dictionary of moments
-        if self.gpu:
-            y = cm.empty((n_samples, self.m))
-            wc = cm.CUDAMatrix(ws)
-            cm.dot(x, wc.T, target=y)  # + noise, but it is included analytically
-            del wc
-            tmp_sum = np.einsum('lj,lj->j', y.asarray(), y.asarray())  # TODO: Should be able to do on gpu...
-        else:
-            y = x.dot(ws.T)
-            tmp_sum = np.einsum('lj,lj->j', y, y)
+        y = x.dot(ws.T)
+        tmp_sum = np.einsum('lj,lj->j', y, y)
         m["uj"] = (1 - self.eps ** 2) * tmp_sum / n_samples + self.eps ** 2 * np.sum(ws ** 2, axis=1)
 
         if np.max(m["uj"]) > 1.0:
             print(np.max(m["uj"]))
             assert False
 
-        if self.gpu:
-            tmp = cm.empty((self.nv, self.m))
-            cm.dot(x.T, y, target=tmp)
-            tmp_dot = tmp.asarray()
-            del tmp
-            del y
-        else:
-            tmp_dot = x.T.dot(y)
+        tmp_dot = x.T.dot(y)
         m["rho"] = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * ws  # m by nv
         m["ry"] = ws.dot(m["rho"].T)  # normalized covariance of Y
         m["Y_j^2"] = self.y_scale ** 2 / (1. - m["uj"])
@@ -332,8 +294,6 @@ class Corex:
         elif self.gaussianize == 'empirical':
             print("Warning: correct inversion/transform of empirical gauss transform not implemented.")
             x = np.array([norm.ppf((rankdata(x_i) - 0.5) / len(x_i)) for x_i in x.T]).T
-        if self.gpu and fit:  # Don't return GPU matrices when only transforming
-            x = cm.CUDAMatrix(x)
         return x
 
     def invert(self, x):
@@ -360,7 +320,7 @@ class Corex:
 
 class TCorexBase(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', gpu=False, y_scale=1.0, update_iter=10,
+                 gaussianize='standard', y_scale=1.0, update_iter=10,
                  pretrained_weights=None, verbose=False, seed=None):
 
         self.nt = nt  # Number of timesteps
@@ -373,9 +333,6 @@ class TCorexBase(object):
         self.missing_values = missing_values
 
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
-        self.gpu = gpu  # Enable GPU support for some large matrix multiplications.
-        if self.gpu:
-            cm.cublas_init()
 
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
         self.update_iter = update_iter  # Compute statistics every update_iter
@@ -442,22 +399,6 @@ class TCorexBase(object):
     def _update_u(self, x):
         self.us = [self.getus(w.get_value(), xt) for w, xt in zip(self.ws, x)]
 
-    def update_records(self, moments, delta):
-        """Print and store some statistics about each iteration."""
-        gc.disable()  # There's a bug that slows when appending, fixed by temporarily disabling garbage collection
-        for t in range(self.nt):
-            self.history[t]["TC"] = self.history[t].get("TC", []) + [moments[t]["TC"]]
-        if self.verbose > 1:
-            tc_sum = sum([m["TC"] for m in moments])
-            add_sum = sum([m.get("additivity", 0) for m in moments])
-            print("TC={:.3f}\tadd={:.3f}\tdelta={:.6f}".format(tc_sum, add_sum, delta))
-        if self.verbose:
-            for t in range(self.nt):
-                self.history[t]["additivity"] = self.history[t].get("additivity", []) + [
-                    moments[t].get("additivity", 0)]
-                self.history[t]["TCs"] = self.history[t].get("TCs", []) + [moments[t].get("TCs", np.zeros(self.m))]
-        gc.enable()
-
     @property
     def tc(self):
         """This actually returns the lower bound on TC that is optimized. The lower bound assumes a constraint that
@@ -481,19 +422,8 @@ class TCorexBase(object):
         """Multiple the matrix u by the covariance matrix of x. We are interested in situations where
         n_variables >> n_samples, so we do this without explicitly constructing the covariance matrix."""
         n_samples = x.shape[0]
-        if self.gpu:
-            y = cm.empty((n_samples, self.m))
-            uc = cm.CUDAMatrix(u)
-            cm.dot(x, uc.T, target=y)
-            del uc
-            tmp = cm.empty((self.nv, self.m))
-            cm.dot(x.T, y, target=tmp)
-            tmp_dot = tmp.asarray()
-            del y
-            del tmp
-        else:
-            y = x.dot(u.T)
-            tmp_dot = x.T.dot(y)
+        y = x.dot(u.T)
+        tmp_dot = x.T.dot(y)
         prod = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * u  # nv by m,  <X_i Y_j> / std Y_j
         return prod
 
@@ -521,25 +451,11 @@ class TCorexBase(object):
         the value of the objective. Note it is assumed that <X_i^2> = 1! """
         m = {}  # Dictionary of moments
         n_samples = x.shape[0]
-        if self.gpu:
-            y = cm.empty((n_samples, self.m))
-            wc = cm.CUDAMatrix(ws)
-            cm.dot(x, wc.T, target=y)  # + noise, but it is included analytically
-            del wc
-            tmp_sum = np.einsum('lj,lj->j', y.asarray(), y.asarray())  # TODO: Should be able to do on gpu...
-        else:
-            y = x.dot(ws.T)
-            tmp_sum = np.einsum('lj,lj->j', y, y)
+        y = x.dot(ws.T)
+        tmp_sum = np.einsum('lj,lj->j', y, y)
         m["uj"] = (1 - self.eps ** 2) * tmp_sum / n_samples + self.eps ** 2 * np.sum(ws ** 2, axis=1)
 
-        if self.gpu:
-            tmp = cm.empty((self.nv, self.m))
-            cm.dot(x.T, y, target=tmp)
-            tmp_dot = tmp.asarray()
-            del tmp
-            del y
-        else:
-            tmp_dot = x.T.dot(y)
+        tmp_dot = x.T.dot(y)
         m["rho"] = (1 - self.eps ** 2) * tmp_dot.T / n_samples + self.eps ** 2 * ws  # m by nv
         m["ry"] = ws.dot(m["rho"].T)  # normalized covariance of Y
         m["Y_j^2"] = self.y_scale ** 2 / (1. - m["uj"])
@@ -587,6 +503,7 @@ class TCorexBase(object):
         'empirical' does an empirical gaussianization (but this cannot be inverted).
         'outliers' tries to squeeze in the outliers
         Any other choice will skip the transformation."""
+        warnings = []
         ret = [None] * len(X)
         if fit:
             self.theta = []
@@ -606,7 +523,8 @@ class TCorexBase(object):
                     self.theta.append((mean, std))
                 x = ((x - self.theta[t][0]) / self.theta[t][1])
                 if np.max(np.abs(x)) > 6 and self.verbose:
-                    print("Warning: outliers more than 6 stds away from mean. Consider using gaussianize='outliers'")
+                    warnings.append("Warning: outliers more than 6 stds away from mean. "
+                                    "Consider using gaussianize='outliers'")
             elif self.gaussianize == 'outliers':
                 if fit:
                     mean = np.mean(x, axis=0)
@@ -614,11 +532,11 @@ class TCorexBase(object):
                     self.theta.append((mean, std))
                 x = g((x - self.theta[t][0]) / self.theta[t][1])  # g truncates long tails
             elif self.gaussianize == 'empirical':
-                print("Warning: correct inversion/transform of empirical gauss transform not implemented.")
+                warnings.append("Warning: correct inversion/transform of empirical gauss transform not implemented.")
                 x = np.array([norm.ppf((rankdata(x_i) - 0.5) / len(x_i)) for x_i in x.T]).T
-            if self.gpu and fit:  # Don't return GPU matrices when only transforming
-                x = cm.CUDAMatrix(x)
             ret[t] = x
+        for w in set(warnings):
+            print(w)
         return ret
 
     def invert(self, x):
