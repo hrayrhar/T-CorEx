@@ -827,7 +827,8 @@ class TCorexWeights(TCorexBase):
                               max_iter=self.max_iter,
                               anneal=self.anneal,
                               verbose=self.verbose,
-                              torch_device=self.torch_device)
+                              torch_device=self.torch_device,
+                              gaussianize=self.gaussianize)
             # take maximum self.max_sample_cnt samples
             data_concat = np.concatenate(x, axis=0)
             if data_concat.shape[0] > self.max_sample_count:

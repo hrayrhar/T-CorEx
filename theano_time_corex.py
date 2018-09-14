@@ -784,7 +784,8 @@ class TCorexPrior1(TCorexBase):
                           n_hidden=self.m,
                           max_iter=self.max_iter,
                           anneal=True,
-                          verbose=self.verbose)
+                          verbose=self.verbose,
+                          gaussianize=self.gaussianize)
         lin_corex.fit(np.concatenate(x, axis=0))
 
         x = [np.array(xt, dtype=np.float32) for xt in x]
@@ -930,7 +931,8 @@ class TCorexPrior2(TCorexBase):
                           n_hidden=self.m,
                           max_iter=self.max_iter,
                           anneal=True,
-                          verbose=self.verbose)
+                          verbose=self.verbose,
+                          gaussianize=self.gaussianize)
         lin_corex.fit(np.concatenate(x, axis=0))
 
         x = [np.array(xt, dtype=np.float32) for xt in x]
@@ -1118,7 +1120,8 @@ class TCorexPrior2Weights(TCorexBase):
                               n_hidden=self.m,
                               max_iter=self.max_iter,
                               anneal=True,
-                              verbose=self.verbose)
+                              verbose=self.verbose,
+                              gaussianize=self.gaussianize)
             lin_corex.fit(np.concatenate(x, axis=0))
             self.pretrained_weights = [lin_corex.ws.get_value()] * self.nt
 
@@ -1311,7 +1314,8 @@ class TCorexWeights(TCorexBase):
                               n_hidden=self.m,
                               max_iter=self.max_iter,
                               anneal=self.anneal,
-                              verbose=self.verbose)
+                              verbose=self.verbose,
+                              gaussianize=self.gaussianize)
             # take maximum self.max_sample_cnt samples
             data_concat = np.concatenate(x, axis=0)
             if data_concat.shape[0] > self.max_sample_count:
