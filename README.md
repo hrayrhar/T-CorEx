@@ -4,15 +4,16 @@ Time-Varying version of [Linear CorEx](https://arxiv.org/abs/1706.03353).
 
 ## Installation
 * Install miniconda 2 or miniconda 3 depending on python version.
-* Install numpy, scipy, sklearn, Theano, Lasagne.
-
+* Install numpy, scipy, sklearn.
+* Install (Theano, Lasagne) and/or PyTorch.
+* (Optional) Install nose for tests.
 
 ## Description
 
-The main method is the `theano_time_corex.TCorexWeights` class. 
+The main method is the `theano_time_corex.TCorex` class.
 It takes a temporal data and learns one linear CorEx for each time step.
 
-Here are the parameters of `TCorexWeights`:
+Here are the parameters of `TCorex`:
 
 * `nt` - number of time steps
 * `nv` - number of variables of time series

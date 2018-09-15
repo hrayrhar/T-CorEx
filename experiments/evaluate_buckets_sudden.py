@@ -2,15 +2,16 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
-from generate_data import *
-from misc_utils import make_sure_path_exists, make_buckets
+from experiments.generate_data import *
+from experiments.utils import make_sure_path_exists, make_buckets
 from sklearn.model_selection import train_test_split
-from theano_time_corex import *
+from pytorch_tcorex import *
+from experiments import baselines
 
 import pickle
 import argparse
-import baselines
 import json
+import os
 
 
 def main():
@@ -30,6 +31,7 @@ def main():
     parser.add_argument('--data_type', dest='data_type', action='store', default='nglf_sudden_change',
                         choices=['nglf_sudden_change', 'general_sudden_change'],
                         help='which dataset to load/create')
+    parser.add_argument('--output_dir', type=str, default='experiments/results/')
     parser.set_defaults(shuffle=False)
     args = parser.parse_args()
     args.nv = args.m * args.bs
@@ -101,7 +103,7 @@ def main():
             'indexOfPenalty': [1],
             'max_iter': 500}),
 
-        (baselines.TCorex(tcorex=TCorex, name='T-Corex (W)'), {
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (simple)'), {
             'nv': args.nv,
             'n_hidden': args.m,
             'max_iter': 500,
@@ -111,10 +113,12 @@ def main():
                 # 'l1': [0, 0.001, 0.003],
                 'l2': []
             },
-            'reg_type': 'W'
+            'reg_type': 'W',
+            'gamma': 1e9,
+            'init': False
         }),
 
-        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples)'), {
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex'), {
             'nv': args.nv,
             'n_hidden': [args.m],
             'max_iter': 500,
@@ -129,7 +133,7 @@ def main():
             'init': True
         }),
 
-        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no reg)'), {
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (no reg)'), {
             'nv': args.nv,
             'n_hidden': [args.m],
             'max_iter': 500,
@@ -143,7 +147,7 @@ def main():
             'init': True
         }),
 
-        (baselines.TCorex(tcorex=TCorexWeights, name='T-Corex (W, weighted samples, no init)'), {
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (no init)'), {
             'nv': args.nv,
             'n_hidden': [args.m],
             'max_iter': 500,
@@ -178,10 +182,11 @@ def main():
         args.snr, args.min_var, args.max_var)
     exp_name = args.prefix + exp_name
     results_path = "results/{}.results.json".format(exp_name)
+    results_path = os.path.join(args.output_dir, results_path)
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[-1:]:
+    for (method, params) in methods[-6:-1]:
         name = method.name
         best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
         results[name] = {}

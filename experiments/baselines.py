@@ -2,22 +2,20 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+from experiments.methods.TVGL import TVGL
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
+from experiments import utils
+
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
-import metric_utils
 import linearcorex
 import numpy as np
 import time
 import itertools
 import random
 import re
-
 import os
-import sys
-sys.path.append('../TVGL')
-import TVGL
 
 
 class Baseline(object):
@@ -72,7 +70,7 @@ class Baseline(object):
             for k, v in const_params.items():
                 cur_params[k] = v
             (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
-            cur_score = metric_utils.calculate_nll_score(data=val_data, covs=cur_covs)
+            cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
 
             if verbose:
                 print('\tcurrent score: {}'.format(cur_score))
@@ -101,7 +99,7 @@ class Baseline(object):
         assert self._trained
         if verbose:
             print("Evaluating {} ...".format(self.name))
-        nll = metric_utils.calculate_nll_score(data=test_data, covs=self._covs)
+        nll = utils.calculate_nll_score(data=test_data, covs=self._covs)
         if verbose:
             print("\tScore: {:.4f}".format(nll))
         return nll
@@ -120,7 +118,7 @@ class Baseline(object):
 class GroundTruth(Baseline):
     def __init__(self, covs, test_data, **kwargs):
         super(GroundTruth, self).__init__(**kwargs)
-        self._score = metric_utils.calculate_nll_score(data=test_data, covs=covs)
+        self._score = utils.calculate_nll_score(data=test_data, covs=covs)
         self._covs = covs
         self._trained = True
 
@@ -411,16 +409,15 @@ class QUIC(Baseline):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
+        os.chdir('experiments/methods/QUIC')
 
         # create exp_id.m file to execute QUIC
         exp_id = random.randint(0, 2 ** 64)
         with open('{}.m'.format(exp_id), 'w') as f:
-            f.write("cd QUIC;\n")
             f.write("mex -llapack QUIC.C QUIC-mex.C;\n")
-            f.write("load('../{}.in.mat');\n".format(exp_id))
+            f.write("load('{}.in.mat');\n".format(exp_id))
             f.write("[X W opt cputime iter dGap] = QUIC('default', sample_cov, lamb, tol, msg, max_iter);\n")
-            f.write("save('-mat', '../{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
-            f.write("cd ..;\n")
+            f.write("save('-mat', '{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
 
         covs = []
         for X in train_data:
@@ -444,10 +441,11 @@ class QUIC(Baseline):
             outs = loadmat('{}.out.mat'.format(exp_id))
             covs.append(np.linalg.inv(outs['X']))
 
-        # delete files
+        # delete files and come back to the root directory
         os.remove('{}.in.mat'.format(exp_id))
         os.remove('{}.out.mat'.format(exp_id))
         os.remove('{}.m'.format(exp_id))
+        os.chdir('../../..')
 
         finish_time = time.time()
         if verbose:
@@ -455,17 +453,17 @@ class QUIC(Baseline):
         return covs, None
 
     def timeit(self, train_data, params):
+        start_time = time.time()
+        os.chdir('experiments/methods/QUIC')
+
         # create exp_id.m file to execute QUIC
         exp_id = random.randint(0, 2 ** 64)
         with open('{}.m'.format(exp_id), 'w') as f:
-            f.write("cd QUIC;\n")
             f.write("mex -llapack QUIC.C QUIC-mex.C;\n")
-            f.write("load('../{}.in.mat');\n".format(exp_id))
+            f.write("load('{}.in.mat');\n".format(exp_id))
             f.write("[X W opt cputime iter dGap] = QUIC('default', sample_cov, lamb, tol, msg, max_iter);\n")
-            f.write("save('-mat', '../{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
-            f.write("cd ..;\n")
+            f.write("save('-mat', '{}.out.mat', 'X', 'W', 'opt', 'cputime', 'iter', 'dGap');\n".format(exp_id))
 
-        start_time = time.time()
         for X in train_data:
             # create exp_id.in.mat file
             savemat('{}.in.mat'.format(exp_id), {
@@ -480,12 +478,14 @@ class QUIC(Baseline):
             process = Popen(['octave', '{}.m'.format(exp_id)], stdout=PIPE, stderr=PIPE)
             process.wait()
 
-        # delete files
+        # delete files and come back to the root directory
         os.remove('{}.in.mat'.format(exp_id))
         os.remove('{}.out.mat'.format(exp_id))
         os.remove('{}.m'.format(exp_id))
+        os.chdir('../../..')
 
-        return time.time() - start_time
+        finish_time = time.time()
+        return finish_time - start_time
 
 
 class BigQUIC(Baseline):
@@ -496,6 +496,7 @@ class BigQUIC(Baseline):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
+        os.chdir('experiments/methods/BigQUIC/bigquic')
 
         exp_id = random.randint(0, 2 ** 64)
         covs = []
@@ -508,8 +509,7 @@ class BigQUIC(Baseline):
 
             # build exp_id.sh file
             with open('{}.sh'.format(exp_id), 'w') as f:
-                f.write('cd BigQUIC_release/bigquic/;\n')
-                f.write('./bigquic-run -l {} -t {} -q {} -e {} ../../{}.in.txt ../../{}.out.txt;\n'.format(
+                f.write('./bigquic-run -l {} -t {} -q {} -e {} {}.in.txt {}.out.txt;\n'.format(
                     params['lamb'],
                     params['max_iter'],
                     params['verbose'],
@@ -517,7 +517,6 @@ class BigQUIC(Baseline):
                     exp_id,
                     exp_id
                 ))
-                f.write('cd ../../\n')
 
             # run created exp_id.m file and wait
             process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
@@ -542,10 +541,11 @@ class BigQUIC(Baseline):
 
             covs.append(np.linalg.inv(precision_mat))
 
-        # delete files
+        # delete files and come back to the root directory
         os.remove('{}.in.txt'.format(exp_id))
         os.remove('{}.out.txt'.format(exp_id))
         os.remove('{}.sh'.format(exp_id))
+        os.chdir('../../../../')
 
         finish_time = time.time()
         if verbose:
@@ -554,6 +554,8 @@ class BigQUIC(Baseline):
 
     def timeit(self, train_data, params):
         start_time = time.time()
+        os.chdir('experiments/methods/BigQUIC/bigquic')
+
         exp_id = random.randint(0, 2 ** 64)
         for X in train_data:
             # create exp_id.in.txt file
@@ -564,8 +566,7 @@ class BigQUIC(Baseline):
 
             # build exp_id.sh file
             with open('{}.sh'.format(exp_id), 'w') as f:
-                f.write('cd BigQUIC_release/bigquic/;\n')
-                f.write('./bigquic-run -l {} -t {} -q {} -e {} ../../{}.in.txt ../../{}.out.txt;\n'.format(
+                f.write('./bigquic-run -l {} -t {} -q {} -e {} {}.in.txt {}.out.txt;\n'.format(
                     params['lamb'],
                     params['max_iter'],
                     params['verbose'],
@@ -573,17 +574,16 @@ class BigQUIC(Baseline):
                     exp_id,
                     exp_id
                 ))
-                f.write('cd ../../\n')
 
             # run created exp_id.m file and wait
             process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
             process.wait()
-            # stdout, stderr = process.communicate()
-            # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
 
-        # delete files
+        # delete files and come back to the root directory
         os.remove('{}.in.txt'.format(exp_id))
         os.remove('{}.out.txt'.format(exp_id))
         os.remove('{}.sh'.format(exp_id))
+        os.chdir('../../../../')
 
-        return time.time() - start_time
+        finish_time = time.time()
+        return finish_time - start_time

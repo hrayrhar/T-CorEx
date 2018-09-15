@@ -625,7 +625,7 @@ class TCorexBase(object):
         return cov
 
 
-class TCorexWeights(TCorexBase):
+class TCorex(TCorexBase):
     def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=2,
                  max_sample_cnt=2 ** 30, **kwargs):
         """
@@ -634,7 +634,7 @@ class TCorexWeights(TCorexBase):
                       If gamma is equal to 1 all samples will be used with weight 1.
         :parm max_sample_cnt: maximum number of samples to use. Setting this to smaller values will give some speed up.
         """
-        super(TCorexWeights, self).__init__(**kwargs)
+        super(TCorex, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
         self.reg_type = reg_type
