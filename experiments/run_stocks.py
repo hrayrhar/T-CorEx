@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from generate_data import *
-from misc_utils import make_sure_path_exists, make_buckets
+from misc_utils import make_sure_path_exists
 from sklearn.model_selection import train_test_split
 from theano_time_corex import *
 

@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from experiments.generate_data import *
-from experiments.utils import make_sure_path_exists, make_buckets
+from experiments.utils import make_sure_path_exists
 from sklearn.model_selection import train_test_split
 from pytorch_tcorex import *
 from experiments import baselines
@@ -28,9 +28,8 @@ def main():
     parser.add_argument('--shuffle', dest='shuffle', action='store_true',
                         help='whether to shuffle parent-child relation')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
-    parser.add_argument('--data_type', dest='data_type', action='store', default='nglf_sudden_change',
-                        choices=['nglf_sudden_change', 'general_sudden_change'],
-                        help='which dataset to load/create')
+    parser.add_argument('--data_type', dest='data_type', action='store', default='nglf',
+                        choices=['nglf', 'general', 'sparse'], help='which dataset to load/create')
     parser.add_argument('--output_dir', type=str, default='experiments/results/')
     parser.set_defaults(shuffle=False)
     args = parser.parse_args()
@@ -181,7 +180,7 @@ def main():
         args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt,
         args.snr, args.min_var, args.max_var)
     exp_name = args.prefix + exp_name
-    results_path = "results/{}.results.json".format(exp_name)
+    results_path = "{}.results.json".format(exp_name)
     results_path = os.path.join(args.output_dir, results_path)
     make_sure_path_exists(results_path)
 

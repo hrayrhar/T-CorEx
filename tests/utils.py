@@ -17,14 +17,14 @@ def load_sp500_with_commodities():
     random.seed(42)
     data_dir = 'data/trading_economics'
     df = pd.read_pickle(os.path.join(data_dir, 'sp500_2000-01-01-2018-06-01_raw.pkl'))
-    
+
     # add commodity prices
     commodity = pd.read_pickle(os.path.join(data_dir, 'commodity_prices.pkl'))
     df = pd.concat([df, commodity], axis=0)
-    
+
     # make a table
     df = df.sort_index()
-    df = df[['symbol','close']]
+    df = df[['symbol', 'close']]
     df = df.pivot_table(index=df.index, columns='symbol', values='close')
     df = df[(df.index >= '2004-02-06') & (df.index <= '2016-03-03')]
 
@@ -63,7 +63,7 @@ def load_sp500_with_commodities():
 
         train_data.append(part[perm[:train_cnt]])
         val_data.append(part[perm[train_cnt:train_cnt + val_cnt]])
-        test_data.append(part[perm[train_cnt+val_cnt:]])
+        test_data.append(part[perm[train_cnt + val_cnt:]])
 
     train_data = np.array(train_data)
     val_data = np.array(val_data)
@@ -71,12 +71,12 @@ def load_sp500_with_commodities():
 
     # add small Gaussian noise
     train_data += np.sqrt(noise_var) * np.random.normal(size=train_data.shape)
-    val_data   += np.sqrt(noise_var) * np.random.normal(size=val_data.shape)
-    test_data  += np.sqrt(noise_var) * np.random.normal(size=test_data.shape)
+    val_data += np.sqrt(noise_var) * np.random.normal(size=val_data.shape)
+    test_data += np.sqrt(noise_var) * np.random.normal(size=test_data.shape)
 
     print('data is loaded:')
     print('\ttrain shape:', train_data.shape)
     print('\tval   shape:', val_data.shape)
     print("\ttest  shape:", test_data.shape)
-    
+
     return train_data, val_data, test_data
