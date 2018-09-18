@@ -27,7 +27,7 @@ def test_tcorex_pytorch_on_sp500():
     tcorex_score = metric_utils.calculate_nll_score(data=val_data, covs=tcorex_covs)
     print("Theano T-CorEx training finished:\n\tscore: {:.2f}\n\ttime: {:.2f}".format(
         tcorex_score, time.time() - start_time))
-    
+
     assert tcorex_score < 510
 
 
@@ -38,7 +38,6 @@ def test_tcorex_theano_on_synthetic_data():
 
     data, _ = load_nglf_smooth_change(nv=128, m=8, nt=10, ns=16+16+100)
     train_data = data[:, :16]
-    val_data = data[:, 16:32]
     test_data = data[:, 32:]
 
     # train pytorch T-CorEx
@@ -51,7 +50,7 @@ def test_tcorex_theano_on_synthetic_data():
     tcorex_score = metric_utils.calculate_nll_score(data=test_data, covs=tcorex_covs)
     print("Theano T-CorEx training finished:\n\tscore: {:.2f}\n\ttime: {:.2f}".format(
         tcorex_score, time.time() - start_time))
-    
+
     # 213 was achieved once, 199 is the ground truth
     assert tcorex_score < 220
     if tcorex_score > 216:

@@ -38,4 +38,3 @@ def test_linear_corex_theano():
         theano_corex_score, time.time() - start_time, theano_corex.tc))
 
     assert np.abs(standard_corex_score - theano_corex_score) < 0.01 * np.abs(standard_corex_score)
-

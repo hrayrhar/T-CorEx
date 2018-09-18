@@ -38,4 +38,3 @@ def test_linear_corex_pytorch():
         pytorch_corex_score, time.time() - start_time, pytorch_corex.tc))
 
     assert np.abs(standard_corex_score - pytorch_corex_score) < 0.01 * np.abs(standard_corex_score)
-
