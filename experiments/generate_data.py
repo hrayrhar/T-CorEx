@@ -19,7 +19,7 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=Fal
     :param m:           Number of latent factors
     :param nt:          Number of time steps
     :param ns:          Number of samples for each time step
-    :param snr:         Signal to noise ratio
+    :param snr:         Average signal to noise ratio (U[0, 2*snr])
     :param min_var:     Minimum variance of x_i
     :param max_var:     Maximum variance of x_i
     :param shuffle:     Whether to shuffle to x_i's
@@ -38,9 +38,9 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=Fal
     # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_var, max_var, size=(nv,))
     cor_signs = np.sign(np.random.normal(size=(nv,)))
-    mean_rho = np.sqrt(snr / (snr + 1.0))
-    cor = cor_signs * mean_rho
-    print("Fixed SNR: {}".format(snr))
+    snrs = np.random.uniform(0, 2*snr, size=(nv,))
+    rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
+    cor = cor_signs * rhos
 
     # Generate data
     if from_matrix:
@@ -128,7 +128,7 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
     :param train_cnt:   Number of train samples
     :param val_cnt:     Number of validation samples
     :param test_cnt:    Number of test samples
-    :param snr:         Signal to noise ratio
+    :param snr:         Average signal to noise ratio (U[0, 2*snr])
     :param min_var:     Minimum variance of x_i
     :param max_var:     Maximum variance of x_i
     :param nglf:        Whether to use NGLF model
@@ -176,7 +176,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
     :param m:       Number of latent factors
     :param nt:      Number of time steps
     :param ns:      Number of test samples for each time step
-    :param snr:     Signal to noise ratio
+    :param snr:     Average signal to noise ratio (U[0, 2*snr])
     :param min_var: Minimum variance of x_i
     :param max_var: Maximum variance of x_i
     :return: (data, ground_truth_cov)
@@ -192,9 +192,9 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
         # NOTE: as z_std doesn't matter, we will set it 1.
         x_std = np.random.uniform(min_var, max_var, size=(nv,))
         cor_signs = np.sign(np.random.normal(size=(nv,)))
-        mean_rho = np.sqrt(float(snr) / (snr + 1))
-        cor = mean_rho * cor_signs
-        print("Fixed SNR: {}".format(snr))
+        snrs = np.random.uniform(0, 2 * snr, size=(nv,))
+        rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
+        cor = cor_signs * rhos
         return x_std, cor
 
     def construct_ground_truth(nv, x_std, cor):
@@ -211,14 +211,21 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
         return sigma
 
     # Generate Data
-    (x_std_1, cor_1) = generate_sufficient_params(nv, snr, min_var, max_var)
-    (x_std_2, cor_2) = generate_sufficient_params(nv, snr, min_var, max_var)
+    n_segments = 4
+    segment_len = 1 + (nt - 1) // n_segments
+    nglfs = []
+    for i in range(n_segments + 1):
+        ret = generate_sufficient_params(nv, snr, min_var, max_var)
+        nglfs.append(ret)
 
     ground_truth = []
     data = np.zeros((nt, ns, nv))
 
-    alphas = np.linspace(0, 1.0, nt)
-    for i, alpha in enumerate(alphas):
+    for i in range(nt):
+        seg_id = i // segment_len
+        x_std_1, cor_1 = nglfs[seg_id]
+        x_std_2, cor_2 = nglfs[seg_id + 1]
+        alpha = (i % segment_len) / np.float(segment_len)
         x_std = (1 - alpha) * x_std_1 + alpha * x_std_2
         cor = (1 - alpha) * cor_1 + alpha * cor_2
         sigma = construct_ground_truth(nv, x_std, cor)
