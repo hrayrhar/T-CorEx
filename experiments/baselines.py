@@ -77,7 +77,8 @@ class Baseline(object):
                 cur_stride = cur_params.pop('stride')
                 bucketed_train_data, index_to_bucket = utils.make_buckets(train_data, cur_window, cur_stride)
                 (cur_covs, cur_method) = self._train(bucketed_train_data, cur_params, verbose)
-                cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
+                if cur_covs is not None:
+                    cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
                 cur_params['window'] = cur_window
                 cur_params['stride'] = cur_stride
             else:

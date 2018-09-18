@@ -45,11 +45,11 @@ def main():
     # gamma --- eps means samples only from the current bucket, while 1-eps means all samples
     tcorex_gamma_range = None
     if 0 < args.window_size <= 16:
-        tcorex_gamma_range = [0.5, 0.6, 0.7, 0.85, 0.9, 0.95]
+        tcorex_gamma_range = [0.4, 0.5, 0.6, 0.7, 0.85, 0.9, 0.95]
     if 16 < args.window_size <= 64:
-        tcorex_gamma_range = [0.3, 0.5, 0.6, 0.7, 0.85, 0.9]
+        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 0.9]
     elif 64 < args.window_size:
-        tcorex_gamma_range = [1e-9, 0.3, 0.5, 0.6, 0.7, 0.85]
+        tcorex_gamma_range = [1e-9, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]
 
     # TODO: use 'half' ? instead of 'full' ?
     methods = [
