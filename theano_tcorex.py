@@ -632,7 +632,9 @@ class TCorexSimple(TCorexBase):
             obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
             self.objs[t] = obj_part_1 + obj_part_2
 
-        self.main_obj = T.sum(self.objs)
+        # experiments show that main_obj scales approximately linearly with nv
+        # also it is a sum of over time steps, so we divide on (nt * nv)
+        self.main_obj = 1.0 / (self.nt * self.nv) * T.sum(self.objs)
 
         # regularization
         reg_matrices = [None] * self.nt
@@ -648,12 +650,15 @@ class TCorexSimple(TCorexBase):
 
         self.reg_obj = T.constant(0)
 
+        # experiments show that L1 and L2 regularizations scale approximately linearly with nv
         if self.l1 > 0:
             l1_reg = T.sum([T.abs_(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = 1.0 / (self.nt * self.nv) * l1_reg
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
             l2_reg = T.sum([T.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
             self.reg_obj = self.reg_obj + self.l2 * l2_reg
 
         self.total_obj = self.main_obj + self.reg_obj
@@ -718,7 +723,7 @@ class TCorex(TCorexBase):
             x_all = []
             for i in range(l, r):
                 cur_ns = self.x_wno[i].shape[0]
-                coef = 1.0 / np.power(self.gamma, np.abs(i - t))
+                coef = np.power(self.gamma, np.abs(i - t))
                 # skip if the importance is too low
                 if coef < 1e-6:
                     continue
@@ -764,7 +769,9 @@ class TCorex(TCorexBase):
             obj_part_2 = 0.5 * T.log(z2).sum(axis=0)
             self.objs[t] = obj_part_1 + obj_part_2
 
-        self.main_obj = T.sum(self.objs)
+        # experiments show that main_obj scales approximately linearly with nv
+        # also it is a sum of over time steps, so we divide on (nt * nv)
+        self.main_obj = 1.0 / (self.nt * self.nv) * T.sum(self.objs)
 
         # regularization
         reg_matrices = [None] * self.nt
@@ -780,12 +787,15 @@ class TCorex(TCorexBase):
 
         self.reg_obj = T.constant(0)
 
+        # experiments show that L1 and L2 regularizations scale approximately linearly with nv
         if self.l1 > 0:
             l1_reg = T.sum([T.abs_(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = 1.0 / (self.nt * self.nv) * l1_reg
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
             l2_reg = T.sum([T.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
             self.reg_obj = self.reg_obj + self.l2 * l2_reg
 
         self.total_obj = self.main_obj + self.reg_obj
@@ -821,19 +831,19 @@ class TCorex(TCorexBase):
             l = max(0, t - window_len[t])
             r = min(self.nt, t + window_len[t] + 1)
             for i in range(l, r):
-                w = 1.0 / np.power(self.gamma, np.abs(i - t))
+                w = np.power(self.gamma, np.abs(i - t))
                 sum_weights += x[i].shape[0] * w
 
             mean_prior = np.zeros((self.nv,))
             for i in range(l, r):
-                w = 1.0 / np.power(self.gamma, np.abs(i - t))
+                w = np.power(self.gamma, np.abs(i - t))
                 for sample in x[i]:
                     mean_prior += w * np.array(sample)
             mean_prior /= sum_weights
 
             var_prior = np.zeros((self.nv,))
             for i in range(l, r):
-                w = 1.0 / np.power(self.gamma, np.abs(i - t))
+                w = np.power(self.gamma, np.abs(i - t))
                 for sample in x[i]:
                     var_prior += w * ((np.array(sample) - mean_prior) ** 2)
             var_prior /= sum_weights
