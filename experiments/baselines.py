@@ -69,7 +69,19 @@ class Baseline(object):
             cur_params = dict(cur_params)
             for k, v in const_params.items():
                 cur_params[k] = v
-            (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
+
+            # divide into buckets if needed
+            if 'window' in cur_params:
+                assert 'stride' in cur_params
+                cur_window = cur_params.pop('window')
+                cur_stride = cur_params.pop('stride')
+                bucketed_train_data, index_to_bucket = utils.make_buckets(train_data, cur_window, cur_stride)
+                (cur_covs, cur_method) = self._train(bucketed_train_data, cur_params, verbose)
+                cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
+                cur_params['window'] = cur_window
+                cur_params['stride'] = cur_stride
+            else:
+                (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
             cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
 
             if verbose:
@@ -310,26 +322,6 @@ class LinearCorex(Baseline):
         return covs, None
 
 
-class LinearCorexWholeData(Baseline):
-    def __init__(self, **kwargs):
-        super(LinearCorexWholeData, self).__init__(**kwargs)
-
-    def _train(self, train_data, params, verbose):
-        if verbose:
-            print("Training {} ...".format(self.name))
-        start_time = time.time()
-        X = np.concatenate(train_data, axis=0)
-        c = linearcorex.Corex(n_hidden=params['n_hidden'],
-                              max_iter=params['max_iter'],
-                              anneal=params['anneal'])
-        c.fit(X)
-        covs = [c.get_covariance() for t in range(len(train_data))]
-        finish_time = time.time()
-        if verbose:
-            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
-        return covs, c
-
-
 class TimeVaryingGraphLasso(Baseline):
     def __init__(self, **kwargs):
         super(TimeVaryingGraphLasso, self).__init__(**kwargs)
@@ -338,18 +330,17 @@ class TimeVaryingGraphLasso(Baseline):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
-        # construct time-series
-        train_data_ts = []
-        for x in train_data:
-            train_data_ts += list(x)
-        train_data_ts = np.array(train_data_ts)
-        inv_covs = TVGL.TVGL(data=train_data_ts,
-                             lengthOfSlice=len(train_data[0]),
-                             lamb=params['lamb'],
-                             beta=params['beta'],
-                             indexOfPenalty=params['indexOfPenalty'],
-                             max_iter=params['max_iter'])
-        covs = [np.linalg.inv(x) for x in inv_covs]
+
+        inv_bucket_covs = TVGL.TVGL(data=np.array(train_data),
+                                    lengthOfSlice=params['lengthOfSlice'],
+                                    lamb=params['lamb'],
+                                    beta=params['beta'],
+                                    indexOfPenalty=params['indexOfPenalty'],
+                                    max_iter=params['max_iter'])
+        bucket_covs = [np.linalg.inv(x) for x in inv_bucket_covs]
+        covs = []
+        for i in range(len(train_data)):
+            covs.append(bucket_covs[i // params['lengthOfSlice']])
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
@@ -357,17 +348,13 @@ class TimeVaryingGraphLasso(Baseline):
 
     def timeit(self, train_data, params):
         # need to write special timeit() to exclude the time spent for linalg.inv()
-        train_data_ts = []
-        for x in train_data:
-            train_data_ts += list(x)
         start_time = time.time()
-        train_data_ts = np.array(train_data_ts)
-        inv_covs = TVGL.TVGL(data=train_data_ts,
-                             lengthOfSlice=len(train_data[0]),
-                             lamb=params['lamb'],
-                             beta=params['beta'],
-                             indexOfPenalty=params['indexOfPenalty'],
-                             max_iter=params['max_iter'])
+        inv_bucket_covs = TVGL.TVGL(data=np.array(train_data),
+                                    lengthOfSlice=params['lengthOfSlice'],
+                                    lamb=params['lamb'],
+                                    beta=params['beta'],
+                                    indexOfPenalty=params['indexOfPenalty'],
+                                    max_iter=params['max_iter'])
         finish_time = time.time()
         return finish_time - start_time
 
