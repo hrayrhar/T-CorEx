@@ -52,7 +52,7 @@ def get_w_from_corex(corex):
 
 class Corex:
     def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None, update_iter=15,
-                 gaussianize='standard', y_scale=1.0, l1=0.0, verbose=False, seed=None):
+                 gaussianize='standard', y_scale=1.0, l1=0.0, verbose=0, seed=None):
 
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
@@ -320,8 +320,8 @@ class Corex:
 
 class TCorexBase(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', y_scale=1.0, update_iter=10,
-                 pretrained_weights=None, verbose=False, seed=None):
+                 gaussianize='standard', y_scale=1.0, update_iter=10, pretrained_weights=None, verbose=0,
+                 seed=None, ignore_sigma=False):
 
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
@@ -339,6 +339,7 @@ class TCorexBase(object):
         self.pretrained_weights = pretrained_weights
         np.random.seed(seed)  # Set seed for deterministic results
         self.verbose = verbose
+        self.ignore_sigma = ignore_sigma
         if verbose:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
@@ -623,9 +624,10 @@ class TCorexSimple(TCorexBase):
             inner_term_2 = self.z[t]  # (ns, m)
             cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
-            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
-            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
-            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+            if not self.ignore_sigma:
+                inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
+                self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+                self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
 
             # objective
             obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), epsilon, np.inf)).sum(axis=0)
@@ -671,8 +673,8 @@ class TCorexSimple(TCorexBase):
                                           outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
 
-        self.get_norm_covariance = theano.function(inputs=self.x_wno,
-                                                   outputs=self.sigma)
+        if not self.ignore_sigma:
+            self.get_norm_covariance = theano.function(inputs=self.x_wno, outputs=self.sigma)
 
 
 class TCorex(TCorexBase):
@@ -759,10 +761,10 @@ class TCorex(TCorexBase):
             cond_mean = outer_term * T.dot(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix
-            # NOTE: even if we don't need explicitly compute sigma, the lines below will not increase running time
-            inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
-            self.sigma[t] = T.dot(inner_mat.T, inner_mat)
-            self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
+            if not self.ignore_sigma:
+                inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / T.clip(1 - R ** 2, epsilon, 1)
+                self.sigma[t] = T.dot(inner_mat.T, inner_mat)
+                self.sigma[t] = self.sigma[t] * (1 - T.eye(self.nv)) + T.eye(self.nv)
 
             # objective
             obj_part_1 = 0.5 * T.log(T.clip(((self.x[t] - cond_mean) ** 2).mean(axis=0), epsilon, np.inf)).sum(axis=0)
@@ -808,8 +810,8 @@ class TCorex(TCorexBase):
                                           outputs=[self.total_obj, self.main_obj, self.reg_obj] + self.objs,
                                           updates=updates)
 
-        self.get_norm_covariance = theano.function(inputs=self.x_wno,
-                                                   outputs=self.sigma)
+        if not self.ignore_sigma:
+            self.get_norm_covariance = theano.function(inputs=self.x_wno, outputs=self.sigma)
 
     def fit(self, x):
         # Compute the window lengths for each time step and define the model
