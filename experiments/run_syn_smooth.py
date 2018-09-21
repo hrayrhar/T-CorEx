@@ -22,8 +22,8 @@ def main():
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
     parser.add_argument('--test_cnt', default=128, type=int, help='number of test samples')
     parser.add_argument('--snr', type=float, default=5.0, help='signal to noise ratio')
-    parser.add_argument('--min_var', type=float, default=0.25, help='minimum x-variance')
-    parser.add_argument('--max_var', type=float, default=4.0, help='maximum x-variance')
+    parser.add_argument('--min_std', type=float, default=0.25, help='minimum x-std')
+    parser.add_argument('--max_std', type=float, default=4.0, help='maximum x-std')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
     parser.add_argument('--data_type', dest='data_type', action='store', default='nglf',
                         choices=['nglf', 'general', 'sparse'], help='which dataset to load/create')
@@ -36,7 +36,7 @@ def main():
     ''' Load data '''
     (data, args.ground_truth_covs) = load_nglf_smooth_change(nv=args.nv, m=args.m, nt=args.nt,
                                                              ns=args.val_cnt + args.test_cnt + 1,
-                                                             snr=args.snr, min_var=args.min_var, max_var=args.max_var)
+                                                             snr=args.snr, min_std=args.min_std, max_std=args.max_std)
     args.train_data = [x[-1] for x in data]
     args.val_data = [x[:args.val_cnt] for x in data]
     args.test_data = [x[args.val_cnt:args.val_cnt+args.test_cnt] for x in data]
@@ -51,7 +51,7 @@ def main():
     elif 64 < args.window_size:
         tcorex_gamma_range = [1e-9, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]
 
-    # TODO: use 'half' ? instead of 'full' ?
+    # NOTE: use 'half' ? instead of 'full' ?
     methods = [
         (baselines.GroundTruth(name='Ground Truth',
                                covs=args.ground_truth_covs,
@@ -132,7 +132,7 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'reg_type': 'W',
@@ -148,7 +148,7 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
+                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
@@ -178,7 +178,7 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
@@ -207,16 +207,16 @@ def main():
         })
     ]
 
-    exp_name = 'smooth.{}.nt{}.m{}.bs{}.window{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_var{:.2f}.max_var{:.2f}'.format(
+    exp_name = 'smooth.{}.nt{}.m{}.bs{}.window{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}'.format(
         args.data_type, args.nt, args.m, args.bs, args.window_size, args.val_cnt, args.test_cnt,
-        args.snr, args.min_var, args.max_var)
+        args.snr, args.min_std, args.max_std)
     exp_name = args.prefix + exp_name
     results_path = "{}.results.json".format(exp_name)
     results_path = os.path.join(args.output_dir, results_path)
     make_sure_path_exists(results_path)
 
     results = {}
-    for (method, params) in methods[0:-1]:
+    for (method, params) in methods[-5:-4]:  #   methods[:1] + methods[8:9]:# #methods[8:9] + methods[-5:-4]:
         name = method.name
         best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
         results[name] = {}

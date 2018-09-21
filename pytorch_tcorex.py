@@ -50,7 +50,7 @@ def get_w_from_corex(corex):
 
 class Corex:
     def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None, update_iter=15,
-                 gaussianize='standard', y_scale=1.0, l1=0.0, verbose=False, torch_device='cpu'):
+                 gaussianize='standard', y_scale=1.0, l1=0.0, verbose=0, torch_device='cpu'):
 
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
@@ -336,7 +336,7 @@ class Corex:
 class TCorexBase(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
                  gaussianize='standard', y_scale=1.0, update_iter=10,
-                 pretrained_weights=None, verbose=False, torch_device='cpu'):
+                 pretrained_weights=None, verbose=0, torch_device='cpu'):
 
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables

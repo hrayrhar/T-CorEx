@@ -12,7 +12,33 @@ import sklearn.covariance as skcov
 import pickle as pkl
 
 
-def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=False, from_matrix=True):
+def nglf_sufficient_params(nv, m, snr, min_std, max_std):
+    # Generate parameters for p(x,z) joint model
+    # NOTE: as z_std doesn't matter, we will set it 1.
+    x_std = np.random.uniform(min_std, max_std, size=(nv,))
+    cor_signs = np.sign(np.random.normal(size=(nv,)))
+    snrs = np.random.uniform(0, 2 * snr, size=(nv,))  # TODO: was [0, 2*snr]
+    rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
+    cor = cor_signs * rhos
+    par = [np.random.randint(0, m) for i in range(nv)]
+    return x_std, cor, par
+
+
+def nglf_matrix_from_params(x_std, cor, par):
+    nv = len(x_std)
+    S = np.zeros((nv, nv))
+    for i in range(nv):
+        for j in range(nv):
+            if par[i] != par[j]:
+                continue
+            if i == j:
+                S[i][j] = x_std[i] ** 2
+            else:
+                S[i][j] = x_std[i] * cor[i] * x_std[j] * cor[j]
+    return S
+
+
+def generate_nglf(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
     """ Generates data according to an NGLF model.
 
     :param nv:          Number of observed variables
@@ -20,40 +46,20 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0, shuffle=Fal
     :param nt:          Number of time steps
     :param ns:          Number of samples for each time step
     :param snr:         Average signal to noise ratio (U[0, 2*snr])
-    :param min_var:     Minimum variance of x_i
-    :param max_var:     Maximum variance of x_i
+    :param min_std:     Minimum std of x_i
+    :param max_std:     Maximum std of x_i
     :param shuffle:     Whether to shuffle to x_i's
     :param from_matrix: Whether to construct and return ground truth covariance matrices
     :return: (data, ground_truth_cov)
     """
 
-    assert nv % m == 0
-    block_size = nv // m
-
-    par = [i // block_size for i in range(nv)]
-    if shuffle:
-        random.shuffle(par)
-
-    # Generate parameters for p(x,z) joint model
-    # NOTE: as z_std doesn't matter, we will set it 1.
-    x_std = np.random.uniform(min_var, max_var, size=(nv,))
-    cor_signs = np.sign(np.random.normal(size=(nv,)))
-    snrs = np.random.uniform(0, 2*snr, size=(nv,))
-    rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
-    cor = cor_signs * rhos
+    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std)
+    if not shuffle:
+        par = [i // block_size for i in range(nv)]
 
     # Generate data
     if from_matrix:
-        # construct the ground truth covariance matrix of x
-        ground_truth = np.zeros((nv, nv))
-        for i in range(nv):
-            for j in range(nv):
-                if par[i] != par[j]:
-                    continue
-                if i == j:
-                    ground_truth[i][j] = x_std[i] ** 2
-                else:
-                    ground_truth[i][j] = x_std[i] * cor[i] * x_std[j] * cor[j]
+        ground_truth = nglf_matrix_from_params(x_std, cor, par)
 
         def generate_single():
             myu = np.zeros((nv,))
@@ -119,7 +125,7 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
 
 
 def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
-                       min_var=0.25, max_var=4.0, nglf=True, shuffle=False, from_matrix=True):
+                       min_std=0.25, max_std=4.0, nglf=True, shuffle=False, from_matrix=True):
     """ Generate data for the synthetic experiment with sudden change.
 
     :param nv:          Number of observed variables
@@ -129,8 +135,8 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
     :param val_cnt:     Number of validation samples
     :param test_cnt:    Number of test samples
     :param snr:         Average signal to noise ratio (U[0, 2*snr])
-    :param min_var:     Minimum variance of x_i
-    :param max_var:     Maximum variance of x_i
+    :param min_std:     Minimum std of x_i
+    :param max_std:     Maximum std of x_i
     :param nglf:        Whether to use NGLF model
     :param shuffle:     Whether to shuffle to x_i's
     :param from_matrix: Whether to construct and return ground truth covariance matrices
@@ -143,13 +149,13 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
 
     if nglf:
         (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle,
+                                        snr=snr, min_std=min_std, max_std=max_std, shuffle=shuffle,
                                         from_matrix=from_matrix)
         # make sure the second generated matrix will be the same no matter of train_cnt
         random.seed(77)
         np.random.seed(77)
         (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_var=min_var, max_var=max_var, shuffle=shuffle,
+                                        snr=snr, min_std=min_std, max_std=max_std, shuffle=shuffle,
                                         from_matrix=from_matrix)
     else:
         (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
@@ -169,7 +175,7 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
     return train_data, val_data, test_data, ground_truth_covs
 
 
-def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
+def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     """ Generates data for the synthetic experiment with smooth varying NGLF model.
 
     :param nv:      Number of observed variables
@@ -177,61 +183,51 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_var=0.25, max_var=4.0):
     :param nt:      Number of time steps
     :param ns:      Number of test samples for each time step
     :param snr:     Average signal to noise ratio (U[0, 2*snr])
-    :param min_var: Minimum variance of x_i
-    :param max_var: Maximum variance of x_i
+    :param min_std: Minimum std of x_i
+    :param max_std: Maximum std of x_i
     :return: (data, ground_truth_cov)
     """
     random.seed(42)
     np.random.seed(42)
 
-    assert nv % m == 0
-    block_size = nv // m
+    # find segment lengths and generate sets of sufficient parameters
+    n_segments = 3
+    segment_lens = [nt // n_segments for i in range(n_segments)]
+    segment_lens[-1] += nt - sum(segment_lens)
+    assert(sum(segment_lens) == nt)
+    nglfs = [nglf_sufficient_params(nv, m, snr, min_std, max_std)
+             for i in range(n_segments + 1)]
 
-    def generate_sufficient_params(nv, snr, min_var, max_var):
-        # Generate parameters for p(x,z) joint model
-        # NOTE: as z_std doesn't matter, we will set it 1.
-        x_std = np.random.uniform(min_var, max_var, size=(nv,))
-        cor_signs = np.sign(np.random.normal(size=(nv,)))
-        snrs = np.random.uniform(0, 2 * snr, size=(nv,))
-        rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
-        cor = cor_signs * rhos
-        return x_std, cor
-
-    def construct_ground_truth(nv, x_std, cor):
-        # Construct the ground truth covariance matrix of x
-        sigma = np.zeros((nv, nv))
-        for i in range(nv):
-            for j in range(nv):
-                if i // block_size != j // block_size:
-                    continue
-                if i == j:
-                    sigma[i][j] = x_std[i] ** 2
-                else:
-                    sigma[i][j] = x_std[i] * cor[i] * x_std[j] * cor[j]
-        return sigma
-
-    # Generate Data
-    n_segments = 4
-    segment_len = 1 + (nt - 1) // n_segments
-    nglfs = []
-    for i in range(n_segments + 1):
-        ret = generate_sufficient_params(nv, snr, min_var, max_var)
-        nglfs.append(ret)
-
+    # generate the data
     ground_truth = []
     data = np.zeros((nt, ns, nv))
+    t = 0
+    for seg_id in range(n_segments):
+        x_std_1, cor_1, par_1 = nglfs[seg_id]
+        x_std_2, cor_2, par_2 = nglfs[seg_id + 1]
+        L = segment_lens[seg_id]
 
-    for i in range(nt):
-        seg_id = i // segment_len
-        x_std_1, cor_1 = nglfs[seg_id]
-        x_std_2, cor_2 = nglfs[seg_id + 1]
-        alpha = (i % segment_len) / np.float(segment_len)
-        x_std = (1 - alpha) * x_std_1 + alpha * x_std_2
-        cor = (1 - alpha) * cor_1 + alpha * cor_2
-        sigma = construct_ground_truth(nv, x_std, cor)
-        ground_truth.append(sigma)
-        myu = np.zeros((nv,))
-        data[i, :] = np.random.multivariate_normal(myu, sigma, size=(ns,))
+        # choose where to change the parent of each x_i
+        change_points = [np.random.randint(1, L) for i in range(nv)]
+
+        par = par_1
+        for st in range(L):
+            # change parents if needed
+            for i in range(nv):
+                if change_points[i] == st:
+                    par[i] = par_2[i]
+
+            # build new sufficient statistics
+            alpha = np.float(st) / L
+            x_std = (1 - alpha) * x_std_1 + alpha * x_std_2
+            cor = (1 - alpha) * cor_1 + alpha * cor_2
+            sigma = nglf_matrix_from_params(x_std, cor, par)
+
+            # generate data for a single time step
+            ground_truth.append(sigma)
+            myu = np.zeros((nv,))
+            data[t, :] = np.random.multivariate_normal(myu, sigma, size=(ns,))
+            t += 1
 
     return data, ground_truth
 
