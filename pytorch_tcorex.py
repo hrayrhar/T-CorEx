@@ -612,7 +612,7 @@ class TCorexBase(object):
 
 
 class TCorex(TCorexBase):
-    def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=2,
+    def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5,
                  max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
         """
         :param gamma: parameter that controls the decay of weights.
@@ -764,7 +764,7 @@ class TCorex(TCorexBase):
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
-            l2_reg = sum([torch.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l2_reg = sum([((reg_matrices[t + 1] - reg_matrices[t]) ** 2).sum() for t in range(self.nt - 1)])
             l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
             self.reg_obj = self.reg_obj + self.l2 * l2_reg
 
@@ -1027,7 +1027,7 @@ class TCorexLearnable(TCorexBase):
             self.reg_obj = self.reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
-            l2_reg = sum([torch.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l2_reg = sum([((reg_matrices[t + 1] - reg_matrices[t]) ** 2).sum() for t in range(self.nt - 1)])
             l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
             self.reg_obj = self.reg_obj + self.l2 * l2_reg
 
