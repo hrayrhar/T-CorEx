@@ -148,7 +148,8 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.3, 1.0, 3.0]
+                # 'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # TODO: recover
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
@@ -156,6 +157,41 @@ def main():
             'init': True,
             'window': args.window_size,
             'stride': 'full'
+        }),
+
+        (baselines.TCorex(tcorex=TCorex, name='T-Corex (weighted objective)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'reg_params': {
+                'l1': [0.0, 0.01, 0.1, 1.0, 10.0]
+                # 'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # TODO: recover
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            },
+            'reg_type': 'W',
+            'init': True,
+            'window': args.window_size,
+            'stride': 'full',
+            'weighted_obj': True
+        }),
+
+        (baselines.TCorex(tcorex=TCorexLearnable, name='T-Corex (learnable)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'reg_params': {
+                'l1': [0.0, 0.01, 0.1, 1.0, 10.0]
+                # 'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # TODO: recover
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            },
+            'reg_type': 'W',
+            'init': True,
+            'window': args.window_size,
+            'stride': 'full',
+            'entropy_lamb': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            'weighted_obj': True
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (no reg)'), {
@@ -211,24 +247,36 @@ def main():
         args.data_type, args.nt, args.m, args.bs, args.window_size, args.val_cnt, args.test_cnt,
         args.snr, args.min_std, args.max_std)
     exp_name = args.prefix + exp_name
-    results_path = "{}.results.json".format(exp_name)
-    results_path = os.path.join(args.output_dir, results_path)
-    make_sure_path_exists(results_path)
 
-    results = {}
-    for (method, params) in methods[-5:-4]:  #   methods[:1] + methods[8:9]:# #methods[8:9] + methods[-5:-4]:
+    best_results_path = "{}.results.json".format(exp_name)
+    best_results_path = os.path.join(args.output_dir, 'best', best_results_path)
+    make_sure_path_exists(best_results_path)
+
+    all_results_path = "{}.results.json".format(exp_name)
+    all_results_path = os.path.join(args.output_dir, 'all', all_results_path)
+    make_sure_path_exists(all_results_path)
+
+    best_results = {}
+    all_results = {}
+    for (method, params) in methods[-7:-6]:#methods[-1:]:#methods[-1:]:# #methods[:1] + methods[8:9]:# #methods[8:9] + methods[-5:-4]:
         name = method.name
-        best_score, best_params, _, _ = method.select(args.train_data, args.val_data, params)
-        results[name] = {}
-        results[name]['test_score'] = method.evaluate(args.test_data, best_params)
-        results[name]['best_params'] = best_params
-        results[name]['best_val_score'] = best_score
+        best_score, best_params, _, _, all_cur_results = method.select(args.train_data, args.val_data, params)
 
-        with open(results_path, 'w') as f:
-            json.dump(results, f)
+        best_results[name] = {}
+        best_results[name]['test_score'] = method.evaluate(args.test_data, best_params)
+        best_results[name]['best_params'] = best_params
+        best_results[name]['best_val_score'] = best_score
 
-    print("Results are saved in {}".format(results_path))
+        all_results[name] = all_cur_results
 
+        with open(best_results_path, 'w') as f:
+            json.dump(best_results, f)
+
+        with open(all_results_path, 'w') as f:
+            json.dump(all_results, f)
+
+    print("Best results are saved in {}".format(best_results_path))
+    print("All results are saved in {}".format(all_results_path))
 
 if __name__ == '__main__':
     main()

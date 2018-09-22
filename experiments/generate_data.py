@@ -17,7 +17,7 @@ def nglf_sufficient_params(nv, m, snr, min_std, max_std):
     # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_std, max_std, size=(nv,))
     cor_signs = np.sign(np.random.normal(size=(nv,)))
-    snrs = np.random.uniform(0, 2 * snr, size=(nv,))  # TODO: was [0, 2*snr]
+    snrs = np.random.uniform(snr, snr, size=(nv,))  # TODO: was [0, 2*snr]
     rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
     cor = cor_signs * rhos
     par = [np.random.randint(0, m) for i in range(nv)]
@@ -53,6 +53,7 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=Fal
     :return: (data, ground_truth_cov)
     """
 
+    block_size = nv // m
     x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std)
     if not shuffle:
         par = [i // block_size for i in range(nv)]
@@ -181,7 +182,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     :param nv:      Number of observed variables
     :param m:       Number of latent factors
     :param nt:      Number of time steps
-    :param ns:      Number of test samples for each time step
+    :param ns:      Number of samples for each time step
     :param snr:     Average signal to noise ratio (U[0, 2*snr])
     :param min_std: Minimum std of x_i
     :param max_std: Maximum std of x_i
@@ -191,7 +192,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     np.random.seed(42)
 
     # find segment lengths and generate sets of sufficient parameters
-    n_segments = 3
+    n_segments = 2
     segment_lens = [nt // n_segments for i in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert(sum(segment_lens) == nt)

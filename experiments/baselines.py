@@ -35,9 +35,9 @@ class Baseline(object):
         best_params = None
         best_covs = None
         best_method = None
+        results = []
 
         const_params = dict()
-
         search_params = []
         for k, v in params.items():
             if isinstance(v, list):
@@ -84,6 +84,7 @@ class Baseline(object):
             else:
                 (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
             cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
+            results.append((cur_params, cur_score))
 
             if verbose:
                 print('\tcurrent score: {}'.format(cur_score))
@@ -102,7 +103,7 @@ class Baseline(object):
         self._covs = best_covs
         self._method = best_method
 
-        return best_score, best_params, best_covs, best_method
+        return best_score, best_params, best_covs, best_method, results
 
     def _train(self, train_data, params, verbose):
         # should return a pair: (covs, method)
