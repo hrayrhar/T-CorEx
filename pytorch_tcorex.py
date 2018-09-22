@@ -48,6 +48,10 @@ def get_w_from_corex(corex):
     return u * np.sqrt(z2).reshape((-1, 1))
 
 
+def entropy(x):
+    return -(x * torch.log(x)).sum(dim=0)
+
+
 class Corex:
     def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None, update_iter=15,
                  gaussianize='standard', y_scale=1.0, l1=0.0, verbose=0, torch_device='cpu'):
@@ -70,7 +74,6 @@ class Corex:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
-        self.history = {}  # Keep track of values for each iteration
         self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
@@ -357,16 +360,14 @@ class TCorexBase(object):
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
-        self.history = [{} for t in range(self.nt)]  # Keep track of values for each iteration
         self.torch_device = torch_device
         self.device = torch.device(torch_device)
 
     def forward(self, x_wno, anneal_eps, indices=None):
         raise NotImplementedError("forward function should be specified for all child classes")
 
-    def _train_loop(self, x):
-        """
-        :param x: is the standardized input (mean ~=0, std ~= 1).
+    def _train_loop(self):
+        """ train loop expects self have two variables x_input and x_std
         """
         if self.verbose:
             print("Starting the training loop ...")
@@ -383,19 +384,17 @@ class TCorexBase(object):
             self.transfer_weights()
 
         # set up the optimizer
-        optimizer = torch.optim.Adam(self.ws)
+        optimizer = torch.optim.Adam(self.ws + self.add_params)
 
         for eps in anneal_schedule:
             start_time = time.time()
-            self.eps = eps  # for Greg's code
-            self.moments = self._calculate_moments(x, self.weights, quick=True)
-            self._update_u(x)
+            self.eps = eps  # for Greg's part of code
             for i_loop in range(self.max_iter):
                 # TODO: write a stopping condition
                 if self.verbose:
                     print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
 
-                ret = self.forward(x, eps)
+                ret = self.forward(self.x_input, eps)
                 obj = ret['total_obj']
 
                 optimizer.zero_grad()
@@ -406,14 +405,14 @@ class TCorexBase(object):
                 main_obj = ret['main_obj']
                 reg_obj = ret['reg_obj']
                 if i_loop % self.update_iter == 0 and self.verbose > 1:
-                    self.moments = self._calculate_moments(x, self.weights, quick=True)
-                    self._update_u(x)
+                    self.moments = self._calculate_moments(self.x_std, self.weights, quick=True)
+                    self._update_u(self.x_std)
                     print("tc: {:.4f}, obj: {:.4f}, main: {:.4f}, reg: {:.4f}, eps: {:.4f}".format(
                         np.sum(self.tc), obj, main_obj, reg_obj, eps))
             print("Annealing iteration finished, time = {}".format(time.time() - start_time))
 
-        self.moments = self._calculate_moments(x, self.weights, quick=False)  # Update moments with details
-        self._update_u(x)
+        self.moments = self._calculate_moments(self.x_std, self.weights, quick=False)  # Update moments with details
+        self._update_u(self.x_std)
 
         # clear cache to free some GPU memory
         if self.torch_device == 'cuda':
@@ -425,7 +424,8 @@ class TCorexBase(object):
         x = [np.array(xt, dtype=np.float32) for xt in x]
         x = self.preprocess(x, fit=True)  # fit a transform for each marginal
         self.x_std = x  # to have an access to standardized x
-        return self._train_loop(x)
+        self.x_input = x  # to have an access to input
+        return self._train_loop()
 
     def transfer_weights(self):
         if self.torch_device == 'cpu':
@@ -593,24 +593,10 @@ class TCorexBase(object):
             ret[t] = self.invert(np.dot(self.moments[t]["X_i Z_j"], y[t].T).T)
         return ret
 
-    """
-    def get_covariance(self):
-        # This uses E(Xi|Y) formula for non-synergistic relationships
-        m = self.moments
-        ret = [None] * self.nt
-        for t in range(self.nt):
-            z = m[t]['rhoinvrho'] / (1 + m[t]['Si'])
-            cov = np.dot(z.T, z)
-            cov /= (1. - self.eps ** 2)
-            np.fill_diagonal(cov, 1)
-            ret[t] = self.theta[t][1][:, np.newaxis] * self.theta[t][1] * cov
-        return ret
-    """
-
     def get_covariance(self, indices=None, normed=False):
         if indices is None:
             indices = range(self.nt)
-        cov = self.forward(self.x_std, anneal_eps=0, indices=indices)['sigma']
+        cov = self.forward(self.x_input, anneal_eps=0, indices=indices)['sigma']
         for t in range(self.nt):
             if cov[t] is None:
                 continue
@@ -627,7 +613,7 @@ class TCorexBase(object):
 
 class TCorex(TCorexBase):
     def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=2,
-                 max_sample_cnt=2 ** 30, **kwargs):
+                 max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
         """
         :param gamma: parameter that controls the decay of weights.
                       weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
@@ -641,6 +627,7 @@ class TCorex(TCorexBase):
         self.init = init
         self.gamma = np.float(gamma)
         self.max_sample_count = max_sample_cnt
+        self.weighted_obj = weighted_obj
         self.window_len = None  # this depends on x and will be computed in fit()
 
         # define the weights of the model
@@ -651,6 +638,7 @@ class TCorex(TCorexBase):
                 wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
                 self.ws.append(wt)
             self.transfer_weights()
+        self.add_params = []  # used in _train_loop()
 
     def forward(self, x_wno, anneal_eps, indices=None):
         # copy x_wno
@@ -715,6 +703,13 @@ class TCorex(TCorexBase):
             z2 = z2_all
             R = R_all
 
+            if self.weighted_obj:
+                X = x_all
+                Z = z_all
+            else:
+                X = self.x[t]
+                Z = self.z[t]
+
             if self.reg_type == 'MI':
                 mi_xz[t] = -0.5 * torch.log1p(-torch.clamp(R ** 2, 0, 1 - epsilon))
 
@@ -724,8 +719,7 @@ class TCorex(TCorexBase):
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
             inner_term_1 = R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))  # (m, nv)
-            # NOTE: we use z[t], but seems only for objective not for the covariance estimate
-            inner_term_2 = self.z[t]  # (ns, m)
+            inner_term_2 = Z  # (ns, m)
             cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix if needed
@@ -736,8 +730,12 @@ class TCorex(TCorexBase):
                 self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
-            obj_part_1 = 0.5 * torch.log(torch.clamp(((self.x[t] - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
-                dim=0)
+            if self.weighted_obj:
+                obj_part_1 = 0.5 * torch.log(
+                    torch.clamp((((X - cond_mean) ** 2) * weights).sum(dim=0), epsilon, np.inf)).sum(dim=0)
+            else:
+                obj_part_1 = 0.5 * torch.log(torch.clamp(((X - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
+                    dim=0)
             obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
             self.objs[t] = obj_part_1 + obj_part_2
 
@@ -819,11 +817,10 @@ class TCorex(TCorexBase):
         x = self.preprocess(x, fit=False)  # standardize the data using the better estimates
         x = [np.array(xt, dtype=np.float32) for xt in x]  # convert to np.float32
         self.x_std = x  # to have an access to standardized x
+        self.x_input = x  # to have an access to input
 
         # initialize weights using the weighs of the linear CorEx trained on all data
         if self.init:
-            # NOTE: we simple linear CorExes in sliding window fashion and initialize using their weights
-            #       but we prefer learning just one linear CorEx on whole data for simplicity and speed.
             if self.verbose:
                 print("Initializing with weights of a linear CorEx learned on whole data")
             init_start = time.time()
@@ -844,4 +841,252 @@ class TCorex(TCorexBase):
             if self.verbose:
                 print("Initialization took {:.2f} seconds".format(time.time() - init_start))
 
-        return self._train_loop(x)
+        return self._train_loop()
+
+
+class TCorexLearnable(TCorexBase):
+    def __init__(self, l1=0.0, l2=0.0, entropy_lamb=0.2, reg_type='W',
+                 init=True, max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
+        """
+        :parm max_sample_cnt: maximum number of samples to use. Setting this to smaller values will give some speed up.
+        """
+        super(TCorexLearnable, self).__init__(**kwargs)
+        self.l1 = l1
+        self.l2 = l2
+        self.entropy_lamb = entropy_lamb
+        self.reg_type = reg_type
+        self.init = init
+        self.max_sample_count = max_sample_cnt
+        self.weighted_obj = weighted_obj
+
+        self.window_len = None  # this depends on x and will be computed in fit()
+        self.sample_weights = None
+        self.theta = [None] * self.nt
+
+        # define the weights of the model
+        if (not self.init) and (self.pretrained_weights is None):
+            self.ws = []
+            for t in range(self.nt):
+                wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
+                wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
+                self.ws.append(wt)
+            self.transfer_weights()
+
+    def forward(self, x_wno, anneal_eps, indices=None):
+        x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
+
+        # compute normalized sample weights
+        norm_sample_weights = []
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            sw = []
+            for i in range(l, r):
+                cur_ns = x_wno[i].shape[0]
+                sw.append(self.sample_weights[t][i-l] * torch.ones((cur_ns,), dtype=dtype, device=self.device))
+            sw = torch.cat(sw, dim=0)
+            sw = sw.softmax(dim=0)
+            sw = sw.reshape((-1, 1))
+            norm_sample_weights.append(sw)
+
+        # normalize x_wno
+        means = []
+        stds = []
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            x_part = torch.cat(x_wno[l:r], dim=0)
+            weights = norm_sample_weights[t]
+            mean = (weights * x_part).sum(dim=0)
+            variance = (weights * (x_part - mean.reshape((1, self.nv))) ** 2).sum(dim=0)
+            std = torch.sqrt(variance)
+            means.append(mean)
+            stds.append(std)
+
+        for t in range(self.nt):
+            x_wno[t] = (x_wno[t] - means[t].reshape((1, self.nv))) / stds[t].reshape((1, self.nv))
+            if self.torch_device == 'cpu':
+                self.theta[t] = (means[t].data.numpy(), stds[t].data.numpy())
+            else:
+                self.theta[t] = (means[t].data.cpu().numpy(), stds[t].data.cpu().numpy())
+
+        # save normalized input
+        self.x_std = []
+        for t in range(self.nt):
+            if self.torch_device == 'cpu':
+                self.x_std.append(x_wno[t].data.numpy())
+            else:
+                self.x_std.append(x_wno[t].data.cpu().numpy())
+
+        # add annealing noise
+        anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
+        for t in range(self.nt):
+            ns = x_wno[t].shape[0]
+            anneal_noise = torch.tensor(np.random.normal(size=(ns, self.nv)), dtype=dtype, device=self.device)
+            x_wno[t] = torch.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
+        self.x = x_wno
+
+        # compute z
+        self.z = [None] * self.nt
+        for t in range(self.nt):
+            ns = x_wno[t].shape[0]
+            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
+            z_mean = torch.mm(self.x[t], self.ws[t].t())
+            self.z[t] = z_mean + z_noise
+
+        epsilon = 1e-8
+        self.objs = [None] * self.nt
+        self.sigma = [None] * self.nt
+        mi_xz = [None] * self.nt
+
+        # store all concatenations here for better memory usage
+        concats = dict()
+
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            weights = norm_sample_weights[t]
+
+            t_range = (l, r)
+            if t_range in concats:
+                x_all = concats[t_range]
+            else:
+                x_all = torch.cat(self.x[l:r], dim=0)
+                concats[t_range] = x_all
+            ns_tot = x_all.shape[0]
+
+            z_all_mean = torch.mm(x_all, self.ws[t].t())
+            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=dtype, device=self.device)
+            z_all = z_all_mean + z_all_noise
+            z2_all = ((z_all ** 2) * weights).sum(dim=0)  # (m,)
+            R_all = torch.mm((z_all * weights).t(), x_all)  # m, nv
+            R_all = R_all / torch.sqrt(z2_all).reshape((self.m, 1))  # as <x^2_i> == 1 we don't divide by it
+
+            z2 = z2_all
+            R = R_all
+
+            if self.weighted_obj:
+                X = x_all
+                Z = z_all
+            else:
+                X = self.x[t]
+                Z = self.z[t]
+
+            if self.reg_type == 'MI':
+                mi_xz[t] = -0.5 * torch.log1p(-torch.clamp(R ** 2, 0, 1 - epsilon))
+
+            # the rest depends on R and z2 only
+            ri = ((R ** 2) / torch.clamp(1 - R ** 2, epsilon, 1 - epsilon)).sum(dim=0)  # (nv,)
+
+            # v_xi | z conditional mean
+            outer_term = (1 / (1 + ri)).reshape((1, self.nv))
+            inner_term_1 = R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+            # NOTE: we use z[t], but seems only for objective not for the covariance estimate
+            inner_term_2 = Z  # (ns, m)
+            cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
+
+            # calculate normed covariance matrix if needed
+            if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
+                inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
+                self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
+                identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
+                self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
+
+            # objective
+            if self.weighted_obj:
+                obj_part_1 = 0.5 * torch.log(
+                    torch.clamp((((X - cond_mean) ** 2) * weights).sum(dim=0), epsilon, np.inf)).sum(dim=0)
+            else:
+                obj_part_1 = 0.5 * torch.log(torch.clamp(((X - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
+                    dim=0)
+            obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
+            self.objs[t] = obj_part_1 + obj_part_2
+
+        # experiments show that main_obj scales approximately linearly with nv
+        # also it is a sum of over time steps, so we divide on (nt * nv)
+        self.main_obj = 1.0 / (self.nt * self.nv) * sum(self.objs)
+
+        # regularization
+        reg_matrices = [None] * self.nt
+        if self.reg_type == 'W':
+            reg_matrices = self.ws
+        if self.reg_type == 'WWT':
+            for t in range(self.nt):
+                reg_matrices[t] = torch.mm(self.ws[t].t(), self.ws[t])
+        if self.reg_type == 'Sigma':
+            reg_matrices = self.sigma
+        if self.reg_type == 'MI':
+            reg_matrices = mi_xz
+
+        self.reg_obj = torch.tensor(0.0, dtype=dtype, device=self.device)
+
+        # experiments show that L1 and L2 regularizations scale approximately linearly with nv
+        if self.l1 > 0:
+            l1_reg = sum([torch.abs(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l1_reg = 1.0 / (self.nt * self.nv) * l1_reg
+            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+
+        if self.l2 > 0:
+            l2_reg = sum([torch.square(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
+            l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
+            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+
+        # self.entropy_obj = sum([entropy(sw) for sw in norm_sample_weights])
+        self.entropy_obj = -sum([torch.max(sw) for sw in norm_sample_weights])
+        self.entropy_obj = -self.entropy_lamb * self.entropy_obj / self.nt
+
+        self.total_obj = self.main_obj + self.reg_obj + self.entropy_obj
+
+        return {'total_obj': self.total_obj,
+                'main_obj': self.main_obj,
+                'reg_obj': self.reg_obj,
+                'entropy_obj': self.entropy_obj,
+                'objs': self.objs,
+                'sigma': self.sigma}
+
+    def fit(self, x):
+        # Compute the window lengths for each time step and define the model
+        n_samples = [len(xt) for xt in x]
+        window_len = [0] * self.nt
+        for i in range(self.nt):
+            k = 0
+            while k <= self.nt and sum(n_samples[max(0, i - k):min(self.nt, i + k + 1)]) < self.max_sample_count:
+                k += 1
+            window_len[i] = k
+        self.window_len = window_len
+
+        # define sample weights
+        self.sample_weights = []
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            self.sample_weights.append(torch.tensor(np.zeros((r - l,)), dtype=dtype,
+                                                    device=self.device, requires_grad=True))
+        self.add_params = self.sample_weights  # used in _train_loop()
+
+        x = [np.array(xt, dtype=np.float32) for xt in x]  # convert to np.float32
+        self.x_input = x  # have an access to input
+
+        # initialize weights using the weighs of the linear CorEx trained on all data
+        if self.init:
+            if self.verbose:
+                print("Initializing with weights of a linear CorEx learned on whole data")
+            init_start = time.time()
+            lin_corex = Corex(nv=self.nv,
+                              n_hidden=self.m,
+                              max_iter=self.max_iter,
+                              anneal=self.anneal,
+                              verbose=self.verbose,
+                              torch_device=self.torch_device,
+                              gaussianize=self.gaussianize)
+            # take maximum self.max_sample_cnt samples
+            data_concat = np.concatenate(x, axis=0)
+            if data_concat.shape[0] > self.max_sample_count:
+                random.shuffle(data_concat)
+                data_concat = data_concat[:self.max_sample_count]
+            lin_corex.fit(data_concat)
+            self.pretrained_weights = [lin_corex.weights] * self.nt
+            if self.verbose:
+                print("Initialization took {:.2f} seconds".format(time.time() - init_start))
+
+        return self._train_loop()
