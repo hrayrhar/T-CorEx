@@ -333,7 +333,12 @@ class TimeVaryingGraphLasso(Baseline):
             print("Training {} ...".format(self.name))
         start_time = time.time()
 
-        inv_bucket_covs = TVGL.TVGL(data=np.array(train_data),
+        # if data is 3D (nt, ns, nv), make it 2D (nt * ns, nv)
+        train_data = np.array(train_data)
+        if train_data.ndim == 3:
+            train_data = train_data.reshape((-1, train_data.shape[-1]))
+
+        inv_bucket_covs = TVGL.TVGL(data=train_data,
                                     lengthOfSlice=params['lengthOfSlice'],
                                     lamb=params['lamb'],
                                     beta=params['beta'],
