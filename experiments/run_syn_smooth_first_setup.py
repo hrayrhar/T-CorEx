@@ -211,6 +211,8 @@ def main():
     exp_name = 'smooth_first_setup.{}.nt{}.m{}.bs{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}'.format(
         args.data_type, args.nt, args.m, args.bs, args.val_cnt, args.test_cnt, args.snr, args.min_std, args.max_std)
     exp_name = args.prefix + exp_name
+    if args.shuffle:
+        exp_name += '.shuffle'
 
     best_results_path = "{}.results.json".format(exp_name)
     best_results_path = os.path.join(args.output_dir, 'best', best_results_path)
