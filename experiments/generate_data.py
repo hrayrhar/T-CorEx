@@ -13,11 +13,12 @@ import pickle as pkl
 
 
 def nglf_sufficient_params(nv, m, snr, min_std, max_std):
-    # Generate parameters for p(x,z) joint model
+    """ Generate parameters for p(x,z) joint model.
+    """
     # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_std, max_std, size=(nv,))
     cor_signs = np.sign(np.random.normal(size=(nv,)))
-    snrs = np.random.uniform(snr, snr, size=(nv,))  # TODO: was [0, 2*snr]
+    snrs = np.random.uniform(0, snr, size=(nv,))
     rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
     cor = cor_signs * rhos
     par = [np.random.randint(0, m) for i in range(nv)]
@@ -25,6 +26,8 @@ def nglf_sufficient_params(nv, m, snr, min_std, max_std):
 
 
 def nglf_matrix_from_params(x_std, cor, par):
+    """ Construct the covariance matrix corresponding to an NGLF model.
+    """
     nv = len(x_std)
     S = np.zeros((nv, nv))
     for i in range(nv):
@@ -38,37 +41,13 @@ def nglf_matrix_from_params(x_std, cor, par):
     return S
 
 
-def generate_nglf(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
-    """ Generates data according to an NGLF model.
-
-    :param nv:          Number of observed variables
-    :param m:           Number of latent factors
-    :param nt:          Number of time steps
-    :param ns:          Number of samples for each time step
-    :param snr:         Average signal to noise ratio (U[0, 2*snr])
-    :param min_std:     Minimum std of x_i
-    :param max_std:     Maximum std of x_i
-    :param shuffle:     Whether to shuffle to x_i's
-    :param from_matrix: Whether to construct and return ground truth covariance matrices
-    :return: (data, ground_truth_cov)
+def sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix=True):
+    """ Sample ns from an NGLF model.
     """
-
-    block_size = nv // m
-    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std)
-    if not shuffle:
-        par = [i // block_size for i in range(nv)]
-
-    # Generate data
     if from_matrix:
-        ground_truth = nglf_matrix_from_params(x_std, cor, par)
-
-        def generate_single():
-            myu = np.zeros((nv,))
-            return np.random.multivariate_normal(myu, ground_truth)
-
-        data = [np.array([generate_single() for i in range(ns)]) for t in range(nt)]
-        return data, ground_truth
-
+        sigma = nglf_matrix_from_params(x_std, cor, par)
+        myu = np.zeros((nv,))
+        return np.random.multivariate_normal(myu, sigma, size=(ns,)), sigma
     else:
         # generates following the probabilistic graphical model
         def generate_single():
@@ -76,26 +55,43 @@ def generate_nglf(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=Fal
             x = np.zeros((nv,))
             for i in range(nv):
                 cond_mean = cor[i] * x_std[i] * z[par[i]]
-                cond_var = x_std[i] ** 2 * (1 - cor[i] ** 2)
+                cond_var = (x_std[i] ** 2) * (1 - cor[i] ** 2)
                 x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
             return x
-
-        data = [np.array([generate_single() for i in range(ns)]) for t in range(nt)]
+        data = np.array([generate_single() for i in range(ns)])
         return data, None
 
 
-def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
+def generate_nglf(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
+    """ Generates data according to an NGLF model.
+
+    :param nv:          Number of observed variables
+    :param m:           Number of latent factors
+    :param ns:          Number of samples
+    :param snr:         Average signal to noise ratio (U[0, snr])
+    :param min_std:     Minimum std of x_i
+    :param max_std:     Maximum std of x_i
+    :param shuffle:     Whether to shuffle to x_i's
+    :param from_matrix: Whether to construct and return ground truth covariance matrices
+    :return: (data, ground_truth_cov)
+    """
+    block_size = nv // m
+    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std)
+    if not shuffle:
+        par = [i // block_size for i in range(nv)]
+    return sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix)
+
+
+def generate_general(nv, m, ns, normalize=False, shuffle=False):
     """ Generate general data using make_spd_matrix() function.
 
     :param nv:        Number of observed variables
     :param m:         Number of latent factors
-    :param nt:        Number of time steps
     :param ns:        Number of samples for each time step
     :param normalize: Whether to set Var[x] = 1
-    :param shuffle: Whether to shuffle to x_i's
+    :param shuffle:   Whether to shuffle to x_i's
     :return: (data, ground_truth_cov)
     """
-
     assert nv % m == 0
     b = nv // m  # block size
 
@@ -117,25 +113,17 @@ def generate_general(nv, m, nt, ns, normalize=False, shuffle=False):
                 sigma_perm[i, j] = sigma[perm[i], perm[j]]
         sigma = sigma_perm
 
-    def generate_single():
-        myu = np.zeros((nv,))
-        return np.random.multivariate_normal(myu, sigma)
-
-    return ([np.array([generate_single() for i in range(ns)])
-             for t in range(nt)], sigma)
+    return np.random.multivariate_normal(myu, sigma, size=(ns,)), sigma
 
 
-def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
-                       min_std=0.25, max_std=4.0, nglf=True, shuffle=False, from_matrix=True):
+def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
     """ Generate data for the synthetic experiment with sudden change.
 
     :param nv:          Number of observed variables
     :param m:           Number of latent factors
     :param nt:          Number of time steps
-    :param train_cnt:   Number of train samples
-    :param val_cnt:     Number of validation samples
-    :param test_cnt:    Number of test samples
-    :param snr:         Average signal to noise ratio (U[0, 2*snr])
+    :param ns:      Number of samples for each time step
+    :param snr:         Average signal to noise ratio (U[0, snr])
     :param min_std:     Minimum std of x_i
     :param max_std:     Maximum std of x_i
     :param nglf:        Whether to use NGLF model
@@ -144,36 +132,28 @@ def load_sudden_change(nv, m, nt, train_cnt, val_cnt, test_cnt, snr=5.0,
                         Valid only when nglf=True
     :return: (train_data, val_data, test_data, ground_truth_covs)
     """
+    # find segment lengths
+    n_segments = 2
+    segment_lens = [nt // n_segments for i in range(n_segments)]
+    segment_lens[-1] += nt - sum(segment_lens)
+    assert (sum(segment_lens) == nt)
 
-    random.seed(42)
-    np.random.seed(42)
+    # generate data
+    data = []
+    ground_truth_covs = []
+    for seg_id in range(n_segments):
+        # make sure each time we generate the same nglf model
+        random.seed(42 + seg_id)
+        np.random.seed(42 + seg_id)
+        # generate for the current segment
+        cur_ns = segment_lens[seg_id] * ns
+        cur_data, cur_sigma = generate_nglf(nv=nv, m=m, ns=cur_ns, snr=snr, min_std=min_std, max_std=max_std,
+                                            shuffle=shuffle, from_matrix=from_matrix)
+        cur_data = cur_data.reshape((segment_lens[seg_id], ns, nv))
+        data += list(cur_data)
+        ground_truth_covs += [cur_sigma] * segment_lens[seg_id]
 
-    if nglf:
-        (data1, sigma1) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_std=min_std, max_std=max_std, shuffle=shuffle,
-                                        from_matrix=from_matrix)
-        # make sure the second generated matrix will be the same no matter of train_cnt
-        random.seed(77)
-        np.random.seed(77)
-        (data2, sigma2) = generate_nglf(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                        snr=snr, min_std=min_std, max_std=max_std, shuffle=shuffle,
-                                        from_matrix=from_matrix)
-    else:
-        (data1, sigma1) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                                    shuffle=shuffle)
-        # make sure the second generated matrix will be the same no matter of train_cnt
-        random.seed(77)
-        np.random.seed(77)
-        (data2, sigma2) = generate_general_make_spd(nv=nv, m=m, nt=nt // 2, ns=train_cnt + val_cnt + test_cnt,
-                                                    shuffle=shuffle)
-
-    data = data1 + data2
-    ground_truth_covs = [sigma1 for t in range(nt // 2)] + [sigma2 for t in range(nt // 2)]
-    train_data = [x[:train_cnt] for x in data]
-    val_data = [x[train_cnt:train_cnt + val_cnt] for x in data]
-    test_data = [x[-test_cnt:] for x in data]
-
-    return train_data, val_data, test_data, ground_truth_covs
+    return data, ground_truth_covs
 
 
 def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
@@ -183,7 +163,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     :param m:       Number of latent factors
     :param nt:      Number of time steps
     :param ns:      Number of samples for each time step
-    :param snr:     Average signal to noise ratio (U[0, 2*snr])
+    :param snr:     Average signal to noise ratio (U[0, snr])
     :param min_std: Minimum std of x_i
     :param max_std: Maximum std of x_i
     :return: (data, ground_truth_cov)
@@ -233,6 +213,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     return data, ground_truth
 
 
+# TODO: Rewrite load_stock_data functions
 def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
                     start_date='2000-01-01', end_date='2018-01-01', stride='one'):
     random.seed(42)
@@ -325,69 +306,4 @@ def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
     return train_data, val_data, test_data
 
 
-def load_stock_data_forecasting(nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
-                                start_date='2000-01-01', end_date='2018-01-01'):
-    random.seed(42)
-    np.random.seed(42)
 
-    print("Loading stock data ...")
-    if data_type == 'stock_week':
-        with open('../data/EOD_week.pkl', 'rb') as f:
-            df = pd.DataFrame(pkl.load(f))
-    elif data_type == 'stock_day':
-        with open('../data/EOD_day.pkl', 'rb') as f:
-            df = pd.DataFrame(pkl.load(f))
-    else:
-        raise ValueError("Unrecognized value '{}' for data_type variable".format(data_type))
-    df = df[df.index >= start_date]
-    df = df[df.index <= end_date]
-
-    # shuffle the columns
-    cols = sorted(list(df.columns))
-    random.shuffle(cols)
-    df = df[cols]
-
-    n_samples = train_cnt + val_cnt + test_cnt
-    assert n_samples <= len(df)
-    df = df[-n_samples:]  # NOTE: this will give just one period. TODO: return multiple periods (sliding window).
-
-    train_data = np.array(df[:train_cnt])
-    val_data = np.array(df[train_cnt:train_cnt+val_cnt])
-    test_data = np.array(df[-test_cnt:])
-
-    # add small gaussian noise
-    noise_var = 1e-5
-    noise_myu = np.zeros((train_data.shape[-1],))
-    noise_cov = np.diag([noise_var] * train_data.shape[-1])
-    train_data += np.random.multivariate_normal(noise_myu, noise_cov, size=train_data.shape[:-1])
-    val_data += np.random.multivariate_normal(noise_myu, noise_cov, size=val_data.shape[:-1])
-    test_data += np.random.multivariate_normal(noise_myu, noise_cov, size=test_data.shape[:-1])
-
-    # find valid variables
-    valid_stocks = []
-    for i in range(train_data.shape[-1]):
-        if np.var(train_data[:, i]) < 1e-2:
-            valid_stocks.append(i)
-
-    # select nv valid variables
-    print("\tremained {} variables".format(len(valid_stocks)))
-    assert len(valid_stocks) >= nv
-    valid_stocks = valid_stocks[:nv]
-    train_data = train_data[:, valid_stocks]
-    val_data = val_data[:, valid_stocks]
-    test_data = test_data[:, valid_stocks]
-
-    # scale the data (this is needed for T-GLASSO to work)
-    coef = np.median(np.sqrt(np.var(train_data, axis=0)))  # median works better than mean because of large outliers
-    train_data = train_data / coef
-    val_data = val_data / coef
-    test_data = test_data / coef
-
-    print('Stock data is loaded:')
-    print('\ttrain shape:', train_data.shape)
-    print('\tval   shape:', val_data.shape)
-    print('\ttest  shape:', test_data.shape)
-
-    return train_data, val_data, test_data
-
-# TODO: finalize loading stock data and write down a short documentation

@@ -19,7 +19,6 @@ def main():
     parser.add_argument('--nt', type=int, help='number of buckets')
     parser.add_argument('--m', type=int, help='number of latent factors')
     parser.add_argument('--bs', type=int, help='block size')
-    parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
     parser.add_argument('--test_cnt', default=128, type=int, help='number of test samples')
     parser.add_argument('--snr', type=float, default=5.0, help='signal to noise ratio')
@@ -29,29 +28,31 @@ def main():
     parser.add_argument('--data_type', dest='data_type', action='store', default='nglf',
                         choices=['nglf', 'general', 'sparse'], help='which dataset to load/create')
     parser.add_argument('--output_dir', type=str, default='experiments/results/')
+    parser.add_argument('--window_size', type=int, default=8)
+    parser.add_argument('--stride', type=str, default='full')
     args = parser.parse_args()
     args.nv = args.m * args.bs
     print(args)
 
     ''' Load data '''
     if args.data_type == 'nglf':
-        (data, ground_truth_covs) = load_nglf_smooth_change(nv=args.nv, m=args.m, nt=args.nt,
-                                                            ns=args.train_cnt + args.val_cnt + args.test_cnt,
+        (data, ground_truth_covs) = load_nglf_sudden_change(nv=args.nv, m=args.m, nt=args.nt,
+                                                            ns=args.val_cnt + args.test_cnt + 1,
                                                             snr=args.snr, min_std=args.min_std, max_std=args.max_std)
     else:
         raise ValueError("data_type={} is not implemented yet.".format(args.data_type))
-    train_data = [x[:args.train_cnt] for x in data]
-    val_data = [x[args.train_cnt:args.train_cnt + args.val_cnt] for x in data]
-    test_data = [x[-args.test_cnt:] for x in data]
+    train_data = [x[-1] for x in data]
+    val_data = [x[:args.val_cnt] for x in data]
+    test_data = [x[args.val_cnt:args.val_cnt + args.test_cnt] for x in data]
 
     ''' Define baselines and the grid of parameters '''
     # gamma --- eps means samples only from the current bucket, while 1-eps means all samples
     tcorex_gamma_range = None
-    if 0 < args.train_cnt <= 16:
+    if 0 < args.window_size <= 16:
         tcorex_gamma_range = [0.4, 0.5, 0.6, 0.7, 0.85, 0.9, 0.95]
-    if 16 < args.train_cnt <= 64:
+    if 16 < args.window_size <= 64:
         tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 0.9]
-    elif 64 < args.train_cnt:
+    elif 64 < args.window_size:
         tcorex_gamma_range = [1e-9, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]
 
     methods = [
@@ -59,14 +60,25 @@ def main():
                                covs=ground_truth_covs,
                                test_data=test_data), {}),
 
-        (baselines.Diagonal(name='Diagonal'), {}),
+        (baselines.Diagonal(name='Diagonal'), {
+            'window': args.window_size,
+            'stride': args.stride
+        }),
 
-        (baselines.LedoitWolf(name='Ledoit-Wolf'), {}),
+        (baselines.LedoitWolf(name='Ledoit-Wolf'), {
+            'window': args.window_size,
+            'stride': args.stride
+        }),
 
-        (baselines.OAS(name='Oracle approximating shrinkage'), {}),
+        (baselines.OAS(name='Oracle approximating shrinkage'), {
+            'window': args.window_size,
+            'stride': args.stride
+        }),
 
         (baselines.PCA(name='PCA'), {
             'n_components': [args.m],
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.SparsePCA(name='SparsePCA'), {
@@ -75,22 +87,30 @@ def main():
             'ridge_alpha': [0.01],
             'tol': 1e-6,
             'max_iter': 500,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.FactorAnalysis(name='Factor Analysis'), {
             'n_components': [args.m],
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.GraphLasso(name='Graphical LASSO (sklearn)'), {
             'alpha': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
             'mode': 'lars',
             'max_iter': 500,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.LinearCorex(name='Linear CorEx'), {
             'n_hidden': [args.m],
             'max_iter': 500,
             'anneal': True,
+            'window': args.window_size,
+            'stride': args.stride,
         }),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
@@ -98,7 +118,7 @@ def main():
             'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'indexOfPenalty': [1],  # NOTE: L2 is very slow and gives bad results
             'max_iter': 500,  # NOTE: checked 1500 no improvement
-            'lengthOfSlice': args.train_cnt
+            'lengthOfSlice': args.window_size,
         }),
 
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO (no reg)'), {
@@ -106,7 +126,7 @@ def main():
             'beta': [0.0],
             'indexOfPenalty': [1],
             'max_iter': 500,
-            'lengthOfSlice': args.train_cnt
+            'lengthOfSlice': args.window_size,
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (simple)'), {
@@ -121,6 +141,8 @@ def main():
             'reg_type': 'W',
             'gamma': 1e9,
             'init': False,
+            'window': args.window_size,
+            'stride': args.stride,
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex'), {
@@ -135,6 +157,8 @@ def main():
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (weighted objective)'), {
@@ -149,6 +173,8 @@ def main():
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True,
+            'window': args.window_size,
+            'stride': args.stride,
             'weighted_obj': True
         }),
 
@@ -163,6 +189,8 @@ def main():
             },
             'reg_type': 'W',
             'init': True,
+            'window': args.window_size,
+            'stride': args.stride,
             'entropy_lamb': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
             'weighted_obj': True
         }),
@@ -177,6 +205,8 @@ def main():
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (no init)'), {
@@ -191,25 +221,32 @@ def main():
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': False,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.QUIC(name='QUIC'), {
             'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
             'tol': 1e-6,
-            'msg': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'msg': 1,         # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100,  # NOTE: tried 500, no improvement,
+            'window': args.window_size,
+            'stride': args.stride
         }),
 
         (baselines.BigQUIC(name='BigQUIC'), {
             'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
             'tol': 1e-3,
-            'verbose': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'verbose': 1,     # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100,  # NOTE: tried 500, no improvement
+            'window': args.window_size,
+            'stride': args.stride
         })
     ]
 
-    exp_name = 'smooth_first_setup.{}.nt{}.m{}.bs{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}'.format(
-        args.data_type, args.nt, args.m, args.bs, args.val_cnt, args.test_cnt, args.snr, args.min_std, args.max_std)
+    exp_name = 'sudden.{}.nt{}.m{}.bs{}.window{}.stride{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}'.format(
+        args.data_type, args.nt, args.m, args.bs, args.window_size, args.stride, args.val_cnt, args.test_cnt,
+        args.snr, args.min_std, args.max_std)
     exp_name = args.prefix + exp_name
 
     best_results_path = "{}.results.json".format(exp_name)
@@ -222,7 +259,7 @@ def main():
 
     best_results = {}
     all_results = {}
-    for (method, params) in methods[:-2]:
+    for (method, params) in methods[:1]:#methods[:-2]:
         name = method.name
         best_score, best_params, _, _, all_cur_results = method.select(train_data, val_data, params)
 
@@ -241,6 +278,7 @@ def main():
 
     print("Best results are saved in {}".format(best_results_path))
     print("All results are saved in {}".format(all_results_path))
+
 
 if __name__ == '__main__':
     main()
