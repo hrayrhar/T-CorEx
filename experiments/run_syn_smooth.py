@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--output_dir', type=str, default='experiments/results/')
     parser.add_argument('--window_size', type=int, default=8)
     parser.add_argument('--stride', type=str, default='full')
+    parser.add_argument('--n_segments', type=int, default=2)
     args = parser.parse_args()
     args.nv = args.m * args.bs
     print(args)
@@ -37,8 +38,9 @@ def main():
     ''' Load data '''
     if args.data_type == 'nglf':
         (data, ground_truth_covs) = load_nglf_smooth_change(nv=args.nv, m=args.m, nt=args.nt,
-                                                                 ns=args.val_cnt + args.test_cnt + 1,
-                                                                 snr=args.snr, min_std=args.min_std, max_std=args.max_std)
+                                                            ns=args.val_cnt + args.test_cnt + 1,
+                                                            snr=args.snr, min_std=args.min_std, max_std=args.max_std,
+                                                            n_segments=args.n_segments)
     else:
         raise ValueError("data_type={} is not implemented yet.".format(args.data_type))
     train_data = [x[-1] for x in data]

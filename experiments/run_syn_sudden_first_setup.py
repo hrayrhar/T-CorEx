@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--shuffle', dest='shuffle', action='store_true',
                         help='whether to shuffle parent-child relation')
     parser.set_defaults(shuffle=False)
+    parser.add_argument('--n_segments', type=int, default=2)
     args = parser.parse_args()
     args.nv = args.m * args.bs
     print(args)
@@ -41,7 +42,8 @@ def main():
         (data, ground_truth_covs) = load_nglf_sudden_change(nv=args.nv, m=args.m, nt=args.nt,
                                                             ns=args.val_cnt + args.test_cnt + args.test_cnt,
                                                             snr=args.snr, min_std=args.min_std,
-                                                            max_std=args.max_std, shuffle=args.shuffle)
+                                                            max_std=args.max_std, shuffle=args.shuffle,
+                                                            n_segments=args.n_segments)
     else:
         raise ValueError("data_type={} is not implemented yet.".format(args.data_type))
     train_data = [x[:args.train_cnt] for x in data]

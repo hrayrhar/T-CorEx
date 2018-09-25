@@ -116,7 +116,8 @@ def generate_general(nv, m, ns, normalize=False, shuffle=False):
     return np.random.multivariate_normal(myu, sigma, size=(ns,)), sigma
 
 
-def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
+def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
+                            from_matrix=True, n_segments=2):
     """ Generate data for the synthetic experiment with sudden change.
 
     :param nv:          Number of observed variables
@@ -130,10 +131,10 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     :param shuffle:     Whether to shuffle to x_i's
     :param from_matrix: Whether to construct and return ground truth covariance matrices
                         Valid only when nglf=True
+    :param n_segments:  Number of segments with constant cov. matrix
     :return: (train_data, val_data, test_data, ground_truth_covs)
     """
     # find segment lengths
-    n_segments = 2
     segment_lens = [nt // n_segments for i in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert (sum(segment_lens) == nt)
@@ -156,7 +157,7 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     return data, ground_truth_covs
 
 
-def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
+def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n_segments=2):
     """ Generates data for the synthetic experiment with smooth varying NGLF model.
 
     :param nv:      Number of observed variables
@@ -166,13 +167,13 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0):
     :param snr:     Average signal to noise ratio (U[0, snr])
     :param min_std: Minimum std of x_i
     :param max_std: Maximum std of x_i
+    :param n_segments: Number of segments where cov. matrix is changing smoothly
     :return: (data, ground_truth_cov)
     """
     random.seed(42)
     np.random.seed(42)
 
     # find segment lengths and generate sets of sufficient parameters
-    n_segments = 2
     segment_lens = [nt // n_segments for i in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert(sum(segment_lens) == nt)
