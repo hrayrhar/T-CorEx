@@ -250,9 +250,9 @@ def main():
         })
     ]
 
-    exp_name = 'sudden.{}.nt{}.m{}.bs{}.window{}.stride{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}'.format(
+    exp_name = 'sudden.{}.nt{}.m{}.bs{}.window{}.stride{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}.n_segments{}'.format(
         args.data_type, args.nt, args.m, args.bs, args.window_size, args.stride, args.val_cnt, args.test_cnt,
-        args.snr, args.min_std, args.max_std)
+        args.snr, args.min_std, args.max_std, args.n_segments)
     exp_name = args.prefix + exp_name
     if args.shuffle:
         exp_name += '.shuffle'
