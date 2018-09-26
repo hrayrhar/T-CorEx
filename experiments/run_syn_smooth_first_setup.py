@@ -30,6 +30,8 @@ def main():
                         choices=['nglf', 'general', 'sparse'], help='which dataset to load/create')
     parser.add_argument('--output_dir', type=str, default='experiments/results/')
     parser.add_argument('--n_segments', type=int, default=1)
+    parser.add_argument('--left', type=int, default=0)
+    parser.add_argument('--right', type=int, default=-2)
     args = parser.parse_args()
     args.nv = args.m * args.bs
     print(args)
@@ -225,7 +227,16 @@ def main():
 
     best_results = {}
     all_results = {}
-    for (method, params) in methods[:-2]:
+
+    # read previously stored values
+    if os.path.exists(best_results_path):
+        with open(best_results_path, 'r') as f:
+            best_results = json.load(f)
+    if os.path.exists(all_results_path):
+        with open(all_results_path, 'r') as f:
+            all_results = json.load(f)
+
+    for (method, params) in methods[args.left:args.right]:
         name = method.name
         best_score, best_params, _, _, all_cur_results = method.select(train_data, val_data, params)
 
