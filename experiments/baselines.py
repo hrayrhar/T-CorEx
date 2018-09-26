@@ -71,19 +71,23 @@ class Baseline(object):
                 cur_params[k] = v
 
             # divide into buckets if needed
-            if 'window' in cur_params:
-                assert 'stride' in cur_params
-                cur_window = cur_params.pop('window')
-                cur_stride = cur_params.pop('stride')
-                bucketed_train_data, index_to_bucket = utils.make_buckets(train_data, cur_window, cur_stride)
-                (cur_covs, cur_method) = self._train(bucketed_train_data, cur_params, verbose)
-                if cur_covs is not None:
-                    cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
-                cur_params['window'] = cur_window
-                cur_params['stride'] = cur_stride
-            else:
-                (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
-            cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
+            try:
+                if 'window' in cur_params:
+                    assert 'stride' in cur_params
+                    cur_window = cur_params.pop('window')
+                    cur_stride = cur_params.pop('stride')
+                    bucketed_train_data, index_to_bucket = utils.make_buckets(train_data, cur_window, cur_stride)
+                    (cur_covs, cur_method) = self._train(bucketed_train_data, cur_params, verbose)
+                    if cur_covs is not None:
+                        cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
+                    cur_params['window'] = cur_window
+                    cur_params['stride'] = cur_stride
+                else:
+                    (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
+                cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
+            except Exception as e:
+                print("Failed to train and evaluate method: {}, message: {}".format(self.name, str(e)))
+                cur_score = None
             results.append((cur_params, cur_score))
 
             if verbose:
