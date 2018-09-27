@@ -2,14 +2,13 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from scipy.stats import multivariate_normal
 from sklearn.datasets import make_spd_matrix
+from sklearn.preprocessing import StandardScaler
 
 import numpy as np
 import random
 import pandas as pd
-import sklearn.covariance as skcov
-import pickle as pkl
+import os
 
 
 def nglf_sufficient_params(nv, m, snr, min_std, max_std):
@@ -214,97 +213,91 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
     return data, ground_truth
 
 
-# TODO: Rewrite load_stock_data functions
-def load_stock_data(nt, nv, train_cnt, val_cnt, test_cnt, data_type='stock_day',
-                    start_date='2000-01-01', end_date='2018-01-01', stride='one'):
-    random.seed(42)
+def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2004-02-06', end_date='2016-03-03',
+               commodities=False, log_return=True, noise_var=1e-4):
+    """ Loads S&P 500 data (optionally with commodity prices).
+    """
     np.random.seed(42)
+    random.seed(42)
 
-    print("Loading stock data ...")
-    if data_type == 'stock_week':
-        with open('../data/EOD_week.pkl', 'rb') as f:
-            df = pd.DataFrame(pkl.load(f))
-    elif data_type == 'stock_day':
-        with open('../data/EOD_day.pkl', 'rb') as f:
-            df = pd.DataFrame(pkl.load(f))
+    # load S&P 500 data
+    data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
+    assert('2000-01-01' <= start_date <= end_date <= '2018-06-01')
+    df = pd.read_pickle(os.path.join(data_dir, 'sp500_2000-01-01-2018-06-01_raw.pkl'))
+
+    # load the table containing sectors of stocks
+    wiki_table = pd.read_csv(os.path.join(data_dir, 'sp500_components_wiki.csv'))
+    symbol_to_category = wiki_table.set_index('Ticker symbol').to_dict()['GICS Sector']
+    symbol_to_category = {k + ":US": v for k, v in symbol_to_category.items()}
+
+    # load commodities if needed
+    if commodities:
+        commodity = pd.read_pickle(os.path.join(data_dir, 'commodity_prices.pkl'))
+        df = pd.concat([df, commodity], axis=0)
+        meta = pd.read_csv(os.path.join(data_dir, 'commodities_metadata.csv'))
+        for (symbol, sector) in zip(meta['symbol'], meta['sector']):
+            symbol_to_category[symbol] = "commodity/" + sector
+
+    # make a table
+    df = df.sort_index()
+    df = df[['symbol', 'close']]
+    df = df.pivot_table(index=df.index, columns='symbol', values='close')
+    df = df[(df.index >= start_date) & (df.index <= end_date)]  # select the period
+    df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    df = df.fillna(method='ffill')  # forward fill missing dates
+
+    if log_return:
+        df = np.log(df).diff()[1:]
     else:
-        raise ValueError("Unrecognized value '{}' for data_type variable".format(data_type))
-    df = df[df.index >= start_date]
-    df = df[df.index <= end_date]
+        df = df.pct_change()[1:]
 
-    # shuffle the columns
-    cols = sorted(list(df.columns))
-    random.shuffle(cols)
-    df = df[cols]
+    df = df.fillna(value=0)  # remaining missing values we treat as no trade, no change
+    df = df.drop(df.columns[df.std(axis=0, skipna=True) < 1e-6], axis=1)  # drop columns with zero variance
 
+    # sort columns by sector
+    order = list(range(len(df.columns)))
+    order = sorted(order, key=lambda x: symbol_to_category[df.columns[x]])
+    df = df[np.array(df.columns)[order]]
+    symbols = df.columns
+    categories = [symbol_to_category[x] for x in df.columns]
+
+    # standardize the raw data
+    X = np.array(df)
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+    # split the data into buckets, stride='full' otherwise the same sample can be both in train and val
     train_data = []
     val_data = []
     test_data = []
-
     window = train_cnt + val_cnt + test_cnt
-    if stride == 'one':
-        indices = range(window, len(df) - window)
-    if stride == 'full':
-        indices = range(window, len(df) - window, window + 1)
-    assert len(indices) >= nt
+    indices = range(0, len(df) - window + 1, window)
 
     for i in indices:
-        start = i - window
-        end = i + window + 1
-        perm = range(2 * window + 1)
+        start = i
+        end = i + window
+        perm = list(range(window))
         random.shuffle(perm)
 
-        part = np.array(df[start:end])
-        assert len(part) == 2 * window + 1
+        part = np.array(X[start:end])
+        assert len(part) == window
 
         train_data.append(part[perm[:train_cnt]])
         val_data.append(part[perm[train_cnt:train_cnt + val_cnt]])
-        test_data.append(part[perm[-test_cnt:]])
+        test_data.append(part[perm[train_cnt + val_cnt:]])
 
-    # take last nt time steps
-    train_data = np.array(train_data[-nt:])
-    val_data = np.array(val_data[-nt:])
-    test_data = np.array(test_data[-nt:])
+    train_data = np.array(train_data)
+    val_data = np.array(val_data)
+    test_data = np.array(test_data)
 
-    # add small gaussian noise
-    noise_var = 1e-5
-    noise_myu = np.zeros((train_data.shape[-1],))
-    noise_cov = np.diag([noise_var] * train_data.shape[-1])
-    train_data += np.random.multivariate_normal(noise_myu, noise_cov, size=train_data.shape[:-1])
-    val_data += np.random.multivariate_normal(noise_myu, noise_cov, size=val_data.shape[:-1])
-    test_data += np.random.multivariate_normal(noise_myu, noise_cov, size=test_data.shape[:-1])
+    # add small Gaussian noise
+    train_data += np.sqrt(noise_var) * np.random.normal(size=train_data.shape)
+    val_data += np.sqrt(noise_var) * np.random.normal(size=val_data.shape)
+    test_data += np.sqrt(noise_var) * np.random.normal(size=test_data.shape)
 
-    # find valid variables
-    valid_stocks = []
-    for i in range(train_data.shape[-1]):
-        ok = True
-        for t in range(train_data.shape[0]):
-            if np.var(train_data[t, :, i]) > 1e-2:
-                ok = False
-                break
-        if ok:
-            valid_stocks.append(i)
-
-    # select nv valid variables
-    print("\tremained {} variables".format(len(valid_stocks)))
-    assert len(valid_stocks) >= nv
-    valid_stocks = valid_stocks[:nv]
-    train_data = train_data[:, :, valid_stocks]
-    val_data = val_data[:, :, valid_stocks]
-    test_data = test_data[:, :, valid_stocks]
-
-    # scale the data (this is needed for T-GLASSO to work)
-    coef = np.sqrt(np.var(train_data, axis=0).mean())
-    train_data = train_data / coef
-    val_data = val_data / coef
-    test_data = test_data / coef
-
-    print('Stock data is loaded:')
+    print('S&P 500 data is loaded:')
     print('\ttrain shape:', train_data.shape)
     print('\tval   shape:', val_data.shape)
-    print('\ttest  shape:', test_data.shape)
+    print("\ttest  shape:", test_data.shape)
 
-    return train_data, val_data, test_data
-
-
-
+    return train_data, val_data, test_data, symbols, categories

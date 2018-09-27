@@ -4,11 +4,9 @@ from __future__ import print_function
 
 from experiments.generate_data import *
 from experiments.utils import make_sure_path_exists
-from sklearn.model_selection import train_test_split
 from pytorch_tcorex import *
 from experiments import baselines
 
-import pickle
 import argparse
 import json
 import os
@@ -105,7 +103,7 @@ def main():
             'lamb': [0.03, 0.1, 0.3, 1.0, 3.0],
             'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'indexOfPenalty': [1],  # NOTE: L2 is very slow and gives bad results
-            'max_iter': 500,  # NOTE: checked 1500 no improvement
+            'max_iter': 500,        # NOTE: checked 1500 no improvement
             'lengthOfSlice': args.train_cnt,
         }),
 

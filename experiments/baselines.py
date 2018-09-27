@@ -88,6 +88,8 @@ class Baseline(object):
             except Exception as e:
                 print("Failed to train and evaluate method: {}, message: {}".format(self.name, str(e)))
                 cur_score = None
+                cur_covs = None
+                cur_method = None
             results.append((cur_params, cur_score))
 
             if verbose:

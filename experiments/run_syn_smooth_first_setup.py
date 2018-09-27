@@ -4,11 +4,9 @@ from __future__ import print_function
 
 from experiments.generate_data import *
 from experiments.utils import make_sure_path_exists
-from sklearn.model_selection import train_test_split
 from pytorch_tcorex import *
 from experiments import baselines
 
-import pickle
 import argparse
 import json
 import os
@@ -101,7 +99,7 @@ def main():
             'lamb': [0.03, 0.1, 0.3, 1.0, 3.0],
             'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             'indexOfPenalty': [1],  # NOTE: L2 is very slow and gives bad results
-            'max_iter': 500,  # NOTE: checked 1500 no improvement
+            'max_iter': 500,        # NOTE: checked 1500 no improvement
             'lengthOfSlice': args.train_cnt
         }),
 
@@ -200,14 +198,14 @@ def main():
         (baselines.QUIC(name='QUIC'), {
             'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
             'tol': 1e-6,
-            'msg': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'msg': 1,         # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100,  # NOTE: tried 500, no improvement,
         }),
 
         (baselines.BigQUIC(name='BigQUIC'), {
             'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
             'tol': 1e-3,
-            'verbose': 1,  # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'verbose': 1,     # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100,  # NOTE: tried 500, no improvement
         })
     ]
@@ -255,6 +253,7 @@ def main():
 
     print("Best results are saved in {}".format(best_results_path))
     print("All results are saved in {}".format(all_results_path))
+
 
 if __name__ == '__main__':
     main()
