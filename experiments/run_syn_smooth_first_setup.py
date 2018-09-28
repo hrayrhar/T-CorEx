@@ -50,11 +50,11 @@ def main():
     # gamma --- eps means samples only from the current bucket, while 1-eps means all samples
     tcorex_gamma_range = None
     if 0 < args.train_cnt <= 16:
-        tcorex_gamma_range = [0.4, 0.5, 0.6, 0.7, 0.85, 0.9, 0.95]
+        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7]
     if 16 < args.train_cnt <= 64:
-        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 0.9]
+        tcorex_gamma_range = [0.2, 0.3, 0.4, 0.5, 0.6]
     elif 64 < args.train_cnt:
-        tcorex_gamma_range = [1e-9, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]
+        tcorex_gamma_range = [1e-9, 0.2, 0.3]
 
     methods = [
         (baselines.GroundTruth(name='Ground Truth',
@@ -131,7 +131,7 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
@@ -145,27 +145,12 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True,
-            'weighted_obj': True
-        }),
-
-        (baselines.TCorex(tcorex=TCorexLearnable, name='T-Corex (learnable)'), {
-            'nv': args.nv,
-            'n_hidden': [args.m],
-            'max_iter': 500,
-            'anneal': True,
-            'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            },
-            'reg_type': 'W',
-            'init': True,
-            'entropy_lamb': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
             'weighted_obj': True
         }),
 
@@ -187,12 +172,27 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': False,
+        }),
+
+        (baselines.TCorex(tcorex=TCorexLearnable, name='T-Corex (learnable)'), {
+            'nv': args.nv,
+            'n_hidden': [args.m],
+            'max_iter': 500,
+            'anneal': True,
+            'reg_params': {
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0],
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            },
+            'reg_type': 'W',
+            'init': True,
+            'entropy_lamb': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            'weighted_obj': True
         }),
 
         (baselines.QUIC(name='QUIC'), {

@@ -11,6 +11,10 @@ import argparse
 import json
 import os
 
+# TODO: fix tcorex lambda=0 and entropy_lambda=0
+# TODO: fix gamma range
+# TODO: fix l1 for learnable
+# TODO: in general copy grid from first_setup
 
 def main():
     parser = argparse.ArgumentParser()
