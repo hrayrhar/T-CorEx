@@ -51,10 +51,12 @@ def main():
     tcorex_gamma_range = None
     if 0 < args.train_cnt <= 16:
         tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7]
-    if 16 < args.train_cnt <= 64:
-        tcorex_gamma_range = [0.2, 0.3, 0.4, 0.5, 0.6]
+    if 16 < args.train_cnt <= 32:
+        tcorex_gamma_range = [0.1, 0.3, 0.4, 0.5, 0.6]
+    if 32 < args.train_cnt <= 64:
+        tcorex_gamma_range = [1e-9, 0.1, 0.3, 0.4, 0.5]
     elif 64 < args.train_cnt:
-        tcorex_gamma_range = [1e-9, 0.2, 0.3]
+        tcorex_gamma_range = [1e-9, 0.1, 0.3]
 
     methods = [
         (baselines.GroundTruth(name='Ground Truth',
