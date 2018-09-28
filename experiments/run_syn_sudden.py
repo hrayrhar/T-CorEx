@@ -141,11 +141,11 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'reg_type': 'W',
-            'gamma': 1e9,
+            'gamma': 1e-9,
             'init': False,
             'window': args.window_size,
             'stride': args.stride,
