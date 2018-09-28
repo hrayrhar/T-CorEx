@@ -29,7 +29,7 @@ class Baseline(object):
 
     def select(self, train_data, val_data, params, verbose=True):
         if verbose:
-            print("\n{}\nSelecting the best parameter values for {} ...".format('-'*80, self.name))
+            print("\n{}\nSelecting the best parameter values for {} ...".format('-' * 80, self.name))
 
         best_score = 1e18
         best_params = None
@@ -341,8 +341,10 @@ class TimeVaryingGraphLasso(Baseline):
 
         # if data is 3D (nt, ns, nv), make it 2D (nt * ns, nv)
         train_data = np.array(train_data)
+        flattened = False
         if train_data.ndim == 3:
             train_data = train_data.reshape((-1, train_data.shape[-1]))
+            flattened = True
 
         inv_bucket_covs = TVGL.TVGL(data=train_data,
                                     lengthOfSlice=params['lengthOfSlice'],
@@ -352,8 +354,11 @@ class TimeVaryingGraphLasso(Baseline):
                                     max_iter=params['max_iter'])
         bucket_covs = [np.linalg.inv(x) for x in inv_bucket_covs]
         covs = []
-        for i in range(len(train_data)):
-            covs.append(bucket_covs[i // params['lengthOfSlice']])
+        if flattened:
+            covs = bucket_covs
+        else:
+            for i in range(len(train_data)):
+                covs.append(bucket_covs[i // params['lengthOfSlice']])
         finish_time = time.time()
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
@@ -362,6 +367,12 @@ class TimeVaryingGraphLasso(Baseline):
     def timeit(self, train_data, params):
         # need to write special timeit() to exclude the time spent for linalg.inv()
         start_time = time.time()
+
+        # if data is 3D (nt, ns, nv), make it 2D (nt * ns, nv)
+        train_data = np.array(train_data)
+        if train_data.ndim == 3:
+            train_data = train_data.reshape((-1, train_data.shape[-1]))
+
         inv_bucket_covs = TVGL.TVGL(data=np.array(train_data),
                                     lengthOfSlice=params['lengthOfSlice'],
                                     lamb=params['lamb'],
@@ -537,7 +548,7 @@ class BigQUIC(Baseline):
                     mas = f.readline().split(' ')
                     row, col = map(int, mas[:2])
                     value = float(mas[2])
-                    precision_mat[row-1, col-1] = value
+                    precision_mat[row - 1, col - 1] = value
 
             covs.append(np.linalg.inv(precision_mat))
 

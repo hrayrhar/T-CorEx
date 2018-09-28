@@ -40,7 +40,7 @@ def main():
     ''' Load data '''
     if args.data_type == 'nglf':
         (data, ground_truth_covs) = load_nglf_sudden_change(nv=args.nv, m=args.m, nt=args.nt,
-                                                            ns=args.val_cnt + args.test_cnt + args.test_cnt,
+                                                            ns=args.train_cnt + args.val_cnt + args.test_cnt,
                                                             snr=args.snr, min_std=args.min_std,
                                                             max_std=args.max_std, shuffle=args.shuffle,
                                                             n_segments=args.n_segments)
