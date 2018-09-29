@@ -49,11 +49,13 @@ def main():
     # gamma --- eps means samples only from the current bucket, while 1-eps means all samples
     tcorex_gamma_range = None
     if 0 < args.train_cnt <= 16:
-        tcorex_gamma_range = [0.4, 0.5, 0.6, 0.7, 0.85, 0.9, 0.95]
-    if 16 < args.train_cnt <= 64:
-        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 0.9]
+        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7]
+    if 16 < args.train_cnt <= 32:
+        tcorex_gamma_range = [0.1, 0.3, 0.4, 0.5, 0.6]
+    if 32 < args.train_cnt <= 64:
+        tcorex_gamma_range = [1e-9, 0.1, 0.3, 0.4, 0.5]
     elif 64 < args.train_cnt:
-        tcorex_gamma_range = [1e-9, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85]
+        tcorex_gamma_range = [1e-9, 0.1, 0.3]
 
     n_hidden_grid = [11]  # the number of sectors
 
@@ -114,11 +116,11 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],  # NOTE: L1 works slightly better
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'reg_type': 'W',
-            'gamma': 1e9,
+            'gamma': 1e-9,
             'init': False,
         }),
 
@@ -128,7 +130,7 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
@@ -142,27 +144,12 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': True,
-            'weighted_obj': True
-        }),
-
-        (baselines.TCorex(tcorex=TCorexLearnable, name='T-Corex (learnable)'), {
-            'nv': nv,
-            'n_hidden': n_hidden_grid,
-            'max_iter': 500,
-            'anneal': True,
-            'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            },
-            'reg_type': 'W',
-            'init': True,
-            'entropy_lamb': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
             'weighted_obj': True
         }),
 
@@ -184,12 +171,27 @@ def main():
             'max_iter': 500,
             'anneal': True,
             'reg_params': {
-                'l1': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
                 # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
             },
             'gamma': tcorex_gamma_range,
             'reg_type': 'W',
             'init': False,
+        }),
+
+        (baselines.TCorex(tcorex=TCorexLearnable, name='T-Corex (learnable)'), {
+            'nv': nv,
+            'n_hidden': n_hidden_grid,
+            'max_iter': 500,
+            'anneal': True,
+            'reg_params': {
+                'l1': [0.0, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+                # 'l2': [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            },
+            'reg_type': 'W',
+            'init': True,
+            'entropy_lamb': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            'weighted_obj': True
         }),
 
         (baselines.QUIC(name='QUIC'), {
@@ -200,9 +202,9 @@ def main():
         }),
 
         (baselines.BigQUIC(name='BigQUIC'), {
-            'lamb': [0.01, 0.03, 0.1, 0.3, 1, 3, 10.0, 30.0],
+            'lamb': [0.3, 1, 3, 10.0, 30.0],
             'tol': 1e-3,
-            'verbose': 1,     # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
+            'verbose': 0,     # NOTE: 0 - no verbosity; 1 - just two lines; 2 - max verbosity
             'max_iter': 100,  # NOTE: tried 500, no improvement
         })
     ]
