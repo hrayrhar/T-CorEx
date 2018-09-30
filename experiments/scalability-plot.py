@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from experiments.generate_data import load_nglf_sudden_change
 from experiments import baselines
 from experiments.utils import make_sure_path_exists
-import theano_tcorex
 import pytorch_tcorex
 import argparse
 import json
@@ -20,23 +19,13 @@ def main():
     print(args)
 
     methods = [
-        # # memory error (for 32GB RAM) after 2048 (inclusive)
-        # (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
-        #     'lamb': 0.1,
-        #     'beta': 1.0,
-        #     'indexOfPenalty': 1,
-        #     'max_iter': 100
-        # }),
-
-        # (baselines.TCorex(tcorex=theano_tcorex.TCorex, name='T-Corex (theano, cuda)'), {
-        #     'max_iter': 100,
-        #     'anneal': True,
-        #     'l1': 0.1,
-        #     'gamma': 0.8,
-        #     'reg_type': 'W',
-        #     'init': True,
-        #     'ignore_sigma': True,
-        # }),
+        # memory error (for 32GB RAM) after 2048 (inclusive)
+        (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
+            'lamb': 0.1,
+            'beta': 1.0,
+            'indexOfPenalty': 1,
+            'max_iter': 100
+        }),
 
         (baselines.TCorex(tcorex=pytorch_tcorex.TCorex, name='T-Corex (pytorch, cpu)'), {
             'max_iter': 100,
@@ -58,19 +47,19 @@ def main():
             'torch_device': 'cuda'
         }),
 
-        # (baselines.QUIC(name='QUIC'), {
-        #     'lamb': 0.1,
-        #     'tol': 1e-6,
-        #     'msg': 1,
-        #     'max_iter': 100
-        # }),
+        (baselines.QUIC(name='QUIC'), {
+            'lamb': 0.1,
+            'tol': 1e-6,
+            'msg': 1,
+            'max_iter': 100
+        }),
 
-        # (baselines.BigQUIC(name='BigQUIC'), {
-        #     'lamb': 3,
-        #     'tol': 1e-3,
-        #     'verbose': 1,
-        #     'max_iter': 100
-        # })
+        (baselines.BigQUIC(name='BigQUIC'), {
+            'lamb': 3,
+            'tol': 1e-3,
+            'verbose': 1,
+            'max_iter': 100
+        })
     ]
 
     times = {}
@@ -104,16 +93,15 @@ def main():
                 continue
             try:
                 ct = method.timeit(data, params)
+                times[method.name].append((nv, ct))
                 print("\ttook {:.2f} seconds".format(ct))
+                # do not time this method again if ct is more than 6 hours
+                if ct > 3600 * 6:
+                    stop_methods.add(method.name)
             except Exception as e:
                 print("\tfailed with message: '{}'".format(e.message))
 
-            # do not time this method again if ct is more than 6 hours
-            if ct > 3600 * 6:
-                stop_methods.add(method.name)
-
             # save results
-            times[method.name].append((nv, ct))
             with open(out_file, 'w') as f:
                 json.dump(times, f)
 

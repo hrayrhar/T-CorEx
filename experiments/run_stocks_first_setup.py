@@ -33,6 +33,7 @@ def main():
     parser.set_defaults(commodities=False)
     parser.set_defaults(log_return=True)
     args = parser.parse_args()
+    print(args)
 
     ''' Load data '''
     train_data, val_data, test_data, _, _ = load_sp500(
@@ -88,7 +89,7 @@ def main():
             'max_iter': 500,
         }),
 
-        (baselines.LinearCorex(name='Linear CorEx (applied bucket-wise)'), {
+        (baselines.LinearCorex(name='Linear CorEx'), {
             'n_hidden': n_hidden_grid,
             'max_iter': 500,
             'anneal': True
