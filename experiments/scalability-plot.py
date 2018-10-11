@@ -24,7 +24,8 @@ def main():
             'lamb': 0.1,
             'beta': 1.0,
             'indexOfPenalty': 1,
-            'max_iter': 100
+            'max_iter': 100,
+            'lengthOfSlice': args.train_cnt,
         }),
 
         (baselines.TCorex(tcorex=pytorch_tcorex.TCorex, name='T-Corex (pytorch, cpu)'), {
@@ -99,7 +100,7 @@ def main():
                 if ct > 3600 * 6:
                     stop_methods.add(method.name)
             except Exception as e:
-                print("\tfailed with message: '{}'".format(e.message))
+                print("\tfailed with message: '{}'".format(str(e)))
 
             # save results
             with open(out_file, 'w') as f:

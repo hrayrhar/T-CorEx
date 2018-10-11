@@ -213,9 +213,10 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
     return data, ground_truth
 
 
-def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2004-02-06', end_date='2016-03-03',
-               commodities=False, log_return=True, noise_var=1e-4):
+def load_sp500(train_cnt, val_cnt, test_cnt, nt=None, start_date='2000-01-01', end_date='2018-01-01',
+               commodities=False, log_return=True, noise_var=1e-4, return_index=False):
     """ Loads S&P 500 data (optionally with commodity prices).
+    If nt is None, all time windows will be returned, otherwise only the last nt time windows will be returned.
     """
     np.random.seed(42)
     random.seed(42)
@@ -300,4 +301,85 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2004-02-06', end_date='
     print('\tval   shape:', val_data.shape)
     print("\ttest  shape:", test_data.shape)
 
+    if return_index:
+        return train_data, val_data, test_data, symbols, categories, df.index
     return train_data, val_data, test_data, symbols, categories
+
+
+def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='2018-01-01',
+                           log_return=True, noise_var=1e-4):
+    """ Loads full trading economics data.
+    """
+    np.random.seed(42)
+    random.seed(42)
+
+    # load trading economics data all stocks
+    data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
+    assert('2000-01-01' <= start_date <= end_date <= '2018-06-01')
+    df = pd.read_pickle(os.path.join(data_dir, 'trading_economics_all_stocks_raw.pkl'))
+
+    # make a table
+    df = df.sort_index()
+    df = df[['symbol', 'close']]
+    df = df.pivot_table(index=df.index, columns='symbol', values='close')
+    df = df[(df.index >= start_date) & (df.index <= end_date)]  # select the period
+    df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    df = df.fillna(method='ffill')  # forward fill missing dates
+    df = df.loc[:, (df < 1e-6).sum() == 0]  # drop columns for which there are negative values
+
+    if log_return:
+        df = np.log(df).diff()[1:]
+    else:
+        df = df.pct_change()[1:]
+
+    df = df.fillna(value=0)  # remaining missing values we treat as no trade, no change
+    df = df.drop(df.columns[df.std(axis=0, skipna=True) < 1e-6], axis=1)  # drop columns with zero variance
+
+    # sort columns by country
+    countries = [x[x.find(":")+1:] for x in df.columns]
+    order = list(range(len(df.columns)))
+    order = sorted(order, key=lambda ind: countries[ind])
+    df = df[np.array(df.columns)[order]]
+    symbols = df.columns
+    countries = [countries[ind] for ind in order]
+
+    # standardize the raw data
+    X = np.array(df)
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+    # split the data into buckets, stride='full' otherwise the same sample can be both in train and val
+    train_data = []
+    val_data = []
+    test_data = []
+    window = train_cnt + val_cnt + test_cnt
+    indices = range(0, len(df) - window + 1, window)
+
+    for i in indices:
+        start = i
+        end = i + window
+        perm = list(range(window))
+        random.shuffle(perm)
+
+        part = np.array(X[start:end])
+        assert len(part) == window
+
+        train_data.append(part[perm[:train_cnt]])
+        val_data.append(part[perm[train_cnt:train_cnt + val_cnt]])
+        test_data.append(part[perm[train_cnt + val_cnt:]])
+
+    train_data = np.array(train_data)
+    val_data = np.array(val_data)
+    test_data = np.array(test_data)
+
+    # add small Gaussian noise
+    train_data += np.sqrt(noise_var) * np.random.normal(size=train_data.shape)
+    val_data += np.sqrt(noise_var) * np.random.normal(size=val_data.shape)
+    test_data += np.sqrt(noise_var) * np.random.normal(size=test_data.shape)
+
+    print('S&P 500 data is loaded:')
+    print('\ttrain shape:', train_data.shape)
+    print('\tval   shape:', val_data.shape)
+    print("\ttest  shape:", test_data.shape)
+
+    return train_data, val_data, test_data, symbols, countries
