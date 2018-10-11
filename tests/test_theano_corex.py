@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import numpy as np
 import linearcorex
-import torch
 import theano_time_corex
 import generate_data
 import metric_utils

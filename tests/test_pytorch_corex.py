@@ -2,7 +2,6 @@ from __future__ import print_function
 
 import numpy as np
 import linearcorex
-import torch
 import pytorch_tcorex
 import generate_data
 import metric_utils

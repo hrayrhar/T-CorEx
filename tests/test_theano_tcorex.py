@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import torch
 import theano_time_corex
 import metric_utils
 import time

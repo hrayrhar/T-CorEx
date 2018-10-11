@@ -15,7 +15,7 @@ def load_sp500_with_commodities():
     """
     np.random.seed(42)
     random.seed(42)
-    data_dir = 'data/trading_economics'
+    data_dir = 'experiments/data/trading_economics'
     df = pd.read_pickle(os.path.join(data_dir, 'sp500_2000-01-01-2018-06-01_raw.pkl'))
 
     # add commodity prices
