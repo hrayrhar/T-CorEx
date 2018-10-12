@@ -18,7 +18,7 @@ def nglf_sufficient_params(nv, m, snr, min_std, max_std):
     x_std = np.random.uniform(min_std, max_std, size=(nv,))
     cor_signs = np.sign(np.random.normal(size=(nv,)))
     snrs = np.random.uniform(0, snr, size=(nv,))
-    rhos = map(lambda s: np.sqrt(s / (s + 1.0)), snrs)
+    rhos = np.sqrt(snrs / (snrs + 1.0))
     cor = cor_signs * rhos
     par = [np.random.randint(0, m) for i in range(nv)]
     return x_std, cor, par

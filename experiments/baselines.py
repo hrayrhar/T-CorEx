@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from experiments.methods.TVGL import TVGL
+# from experiments.methods.TVGL import TVGL
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
 from experiments import utils
