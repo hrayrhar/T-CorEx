@@ -35,7 +35,7 @@ The main method is the class 'pytorch_tcorex.TCorex'. It has the following param
 | `l2` | A non-negative number specifying the weight of L2 temporal regularization. Use either `l1` or `l2`.|
 | `reg_type` | What to regularize. The default value is 'W', which works the best. It means to regularize  (W_{t+1} - W_t). |
 | `init` | `True` or `False`. The default is `True`. Whether to initialize the weights with the weights of a linear CorEx learnt on whole data. Setting this `True` is almost always helpful.|
-| `gamma` | Real number in [0,1]. This argument controls the weighs of different samples used for estimating some entities at time step t. The formula of weights is: weight_t(t') = gamma ^ (\| t' - t\|). If the time series are very dynamic the value of gamma should be higher.|
+| `gamma` | Real number in [0,1]. This argument controls the weighs of different samples used for estimating some entities at time step t. The formula of weights is: weight_t(t') = gamma ^ (\| t' - t\|). If the time series are very dynamic the value of gamma should be lower.|
 | `weighted_obj` | `True` or `False`. Whether the objective for time step t uses the samples of other timesteps. The default is `False`.|
 
 
