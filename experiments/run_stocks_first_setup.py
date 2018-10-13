@@ -59,7 +59,7 @@ def main():
     elif 64 < args.train_cnt:
         tcorex_gamma_range = [1e-9, 0.1, 0.3]
 
-    n_hidden_grid = [11]  # the number of sectors
+    n_hidden_grid = [16, 32, 64, 128]
 
     methods = [
         (baselines.Diagonal(name='Diagonal'), {}),
@@ -76,8 +76,8 @@ def main():
             'n_components': n_hidden_grid,
             'alpha': [0.1, 0.3, 1.0, 3.0, 10.0, 30.0],
             'ridge_alpha': [0.01],
-            'tol': 1e-6,
-            'max_iter': 500,
+            'tol': 1e-3,
+            'max_iter': 100,  # NOTE: tried 500 no improvement, just slows down a lot !
         }),
 
         (baselines.FactorAnalysis(name='Factor Analysis'), {
@@ -192,7 +192,7 @@ def main():
             },
             'reg_type': 'W',
             'init': True,
-            'entropy_lamb': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            'entropy_lamb': [0.0, 0.1, 0.3, 0.5, 0.8],
             'weighted_obj': True
         }),
 
