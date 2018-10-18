@@ -10,9 +10,9 @@ def calculate_nll_score(data, covs):
     """ Calculate negative log-likelihood of covariance estimates under data.
     """
     nt = len(data)
+    assert len(covs) == nt
     try:
-        nll = [-np.mean([multivariate_normal.logpdf(sx, cov=covs[t]) for sx in x])
-               for x, t in zip(data, range(nt))]
+        nll = [-multivariate_normal.logpdf(data[t], cov=covs[t]).mean() for t in range(nt)]
     except Exception:
         nll = [np.inf]
     return np.mean(nll)
