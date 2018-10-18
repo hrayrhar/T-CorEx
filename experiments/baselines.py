@@ -6,6 +6,7 @@ from __future__ import absolute_import
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
 from experiments import utils
+from regain.covariance import LatentTimeGraphLasso
 
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
@@ -596,5 +597,51 @@ class BigQUIC(Baseline):
         os.remove('{}.sh'.format(exp_id))
         os.chdir('../../../../')
 
+        finish_time = time.time()
+        return finish_time - start_time
+
+
+class LTGL(Baseline):
+    def __init__(self, **kwargs):
+        """
+        LTGL model is described here: https://arxiv.org/pdf/1802.03987v2.pdf.
+        """
+        super(LTGL, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+
+        train_data = np.array(train_data)  # expects 3D data
+        ltgl = LatentTimeGraphLasso(alpha=params['alpha'],
+                                    tau=params['tau'],
+                                    beta=params['beta'],
+                                    psi=params['psi'],
+                                    eta=params['eta'],
+                                    phi=params['phi'],
+                                    rho=params['rho'],
+                                    max_iter=params['max_iter'],
+                                    verbose=params['verbose'])
+        ltgl.fit(train_data)
+        covs = ltgl.covariance_
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return covs, None
+
+    def timeit(self, train_data, params):
+        start_time = time.time()
+        train_data = np.array(train_data)  # expects 3D data
+        ltgl = LatentTimeGraphLasso(alpha=params['alpha'],
+                                    tau=params['tau'],
+                                    beta=params['beta'],
+                                    psi=params['psi'],
+                                    eta=params['eta'],
+                                    phi=params['phi'],
+                                    rho=params['rho'],
+                                    max_iter=params['max_iter'],
+                                    verbose=params['verbose'])
+        ltgl.fit(train_data)
         finish_time = time.time()
         return finish_time - start_time

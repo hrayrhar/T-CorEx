@@ -201,6 +201,18 @@ def main():
             'weighted_obj': True
         }),
 
+        (baselines.LTGL(name='LTGL'), {
+            'alpha': [1.0, 3.0, 10.0],    # 3.0 was the best
+            'tau': [30.0, 100.0, 300.0],  # 100.0 was the best
+            'beta': [3.0, 10.0, 30.0],    # 10.0 was the best
+            'psi': 'l1',                  # seems to be the best for sudden change
+            'eta': [3.0, 10.0, 30.0],     # 10.0 was the best
+            'phi': 'l1',                  # seems to be the best for sudden change
+            'rho': [1.0, 3.0, 10.0],      # 3.0 was the best
+            'max_iter': 500,              # NOTE: tried 1000 no improvement
+            'verbose': False
+        }),
+
         (baselines.QUIC(name='QUIC'), {
             'lamb': [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3],
             'tol': 1e-6,
