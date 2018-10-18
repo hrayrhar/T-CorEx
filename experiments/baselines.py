@@ -2,7 +2,6 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-# from experiments.methods.TVGL import TVGL
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
 from experiments import utils
@@ -336,6 +335,7 @@ class TimeVaryingGraphLasso(Baseline):
         super(TimeVaryingGraphLasso, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        from experiments.methods.TVGL import TVGL
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -367,6 +367,7 @@ class TimeVaryingGraphLasso(Baseline):
 
     def timeit(self, train_data, params):
         # need to write special timeit() to exclude the time spent for linalg.inv()
+        from experiments.methods.TVGL import TVGL
         start_time = time.time()
 
         # if data is 3D (nt, ns, nv), make it 2D (nt * ns, nv)
