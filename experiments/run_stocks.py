@@ -1,1 +1,0 @@
-# TODO: write similar to run_stocks_first_setup.py
