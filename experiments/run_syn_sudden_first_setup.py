@@ -104,7 +104,7 @@ def main():
         (baselines.TimeVaryingGraphLasso(name='T-GLASSO'), {
             'lamb': [0.03, 0.1, 0.3, 1.0, 3.0],
             'beta': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
-            'indexOfPenalty': [1],  # NOTE: L2 is very slow and gives bad results
+            'indexOfPenalty': [1],  # NOTE: L2 is very slow, gives bad results; Laplacian gives worse results
             'max_iter': 500,        # NOTE: checked 1500 no improvement
             'lengthOfSlice': args.train_cnt,
         }),
@@ -201,14 +201,22 @@ def main():
             'weighted_obj': True
         }),
 
+        (baselines.LVGLASSO(name='LVGLASSO'), {
+            'alpha': [0.03, 0.1, 0.3, 1.0, 3.0, 10.0],
+            'tau': [1.0, 3.0, 10.0, 30.0, 100.0, 300.0],
+            'rho': 1.0 / np.sqrt(args.train_cnt),  # NOTE works good, also rho doesn't change much
+            'max_iter': 500,                       # NOTE: tried 1000 no improvement
+            'verbose': False,
+        }),
+
         (baselines.LTGL(name='LTGL'), {
-            'alpha': [1.0, 3.0, 10.0],    # 3.0 was the best
-            'tau': [30.0, 100.0, 300.0],  # 100.0 was the best
-            'beta': [3.0, 10.0, 30.0],    # 10.0 was the best
+            'alpha': [0.3, 1.0, 3.0, 10.0],
+            'tau': [10.0, 30.0, 100.0, 300.0, 1e3],
+            'beta': [1.0, 3.0, 10.0, 30.0, 100.0],
             'psi': 'l1',                  # seems to be the best for sudden change
-            'eta': [3.0, 10.0, 30.0],     # 10.0 was the best
+            'eta': [3.0, 10.0, 30.0],
             'phi': 'l1',                  # seems to be the best for sudden change
-            'rho': [1.0, 3.0, 10.0],      # 3.0 was the best
+            'rho': 1.0 / np.sqrt(args.train_cnt),
             'max_iter': 500,              # NOTE: tried 1000 no improvement
             'verbose': False
         }),

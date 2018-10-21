@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
 from experiments import utils
-from regain.covariance import LatentTimeGraphLasso
+from regain.covariance import LatentTimeGraphLasso, LatentGraphLasso
 
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
@@ -644,5 +644,43 @@ class LTGL(Baseline):
                                     max_iter=params['max_iter'],
                                     verbose=params['verbose'])
         ltgl.fit(train_data)
+        finish_time = time.time()
+        return finish_time - start_time
+
+
+class LVGLASSO(Baseline):
+    def __init__(self, **kwargs):
+        """
+        LVGLASSO model is described here: https://ieeexplore.ieee.org/abstract/document/5707106.
+        """
+        super(LVGLASSO, self).__init__(**kwargs)
+
+    def _train(self, train_data, params, verbose):
+        if verbose:
+            print("Training {} ...".format(self.name))
+        start_time = time.time()
+        covs = []
+        for X in train_data:
+            lvglasso = LatentGraphLasso(alpha=params['alpha'],
+                                        tau=params['tau'],
+                                        rho=params['rho'],
+                                        max_iter=params['max_iter'],
+                                        verbose=params['verbose'])
+            lvglasso.fit(X)
+            covs.append(lvglasso.covariance_)
+        finish_time = time.time()
+        if verbose:
+            print("\tElapsed time {:.1f}s".format(finish_time - start_time))
+        return covs, None
+
+    def timeit(self, train_data, params):
+        start_time = time.time()
+        for X in train_data:
+            lvglasso = LatentGraphLasso(alpha=params['alpha'],
+                                        tau=params['tau'],
+                                        rho=params['rho'],
+                                        max_iter=params['max_iter'],
+                                        verbose=params['verbose'])
+            lvglasso.fit(X)
         finish_time = time.time()
         return finish_time - start_time
