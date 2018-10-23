@@ -206,12 +206,12 @@ def main():
         }),
 
         (baselines.LTGL(name='LTGL'), {
-            'alpha': [0.3, 1.0, 3.0, 10.0],
-            'tau': [10.0, 30.0, 100.0, 300.0, 1e3],
+            'alpha': [3.0, 10.0, 30.0, 1e2],
+            'tau': [30.0, 100.0, 300.0, 1e3, 3e3],
             'beta': [1.0, 3.0, 10.0, 30.0, 100.0],
-            'psi': 'l1',
-            'eta': [3.0, 10.0, 30.0],        # 10.0 was the best
-            'phi': 'l1',
+            'psi': 'l1',                    # NOTE: tried Laplacian and L2
+            'eta': [1.0, 3.0, 10.0],
+            'phi': 'l1',                    # NOTE: tried Laplacian and L2
             'rho': 1.0 / np.sqrt(args.train_cnt),
             'max_iter': 500,                # NOTE: tried 1000 no improvement
             'verbose': False
