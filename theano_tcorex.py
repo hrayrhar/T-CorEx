@@ -1,3 +1,11 @@
+""" T-CorEx - Linear Time Covariance Estimation method based on Linear CorEx.
+Given time-series data returns the covariance matrix for each time period.
+More details coming soon ...
+Code below written by:
+Hrayr Harutyunyan (harhro@gmail.edu) and Greg Ver Steeg (gregv@isi.edu).
+"""
+
+
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
