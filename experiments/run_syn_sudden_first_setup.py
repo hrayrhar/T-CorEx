@@ -213,9 +213,9 @@ def main():
             'alpha': [0.3, 1.0, 3.0, 10.0],
             'tau': [10.0, 30.0, 100.0, 300.0, 1e3],
             'beta': [1.0, 3.0, 10.0, 30.0, 100.0],
-            'psi': 'l1',                  # seems to be the best for sudden change
+            'psi': 'l1',                  # tried L2, works worse
             'eta': [3.0, 10.0, 30.0],
-            'phi': 'l1',                  # seems to be the best for sudden change
+            'phi': 'l1',                  # tried L2, works worse
             'rho': 1.0 / np.sqrt(args.train_cnt),
             'max_iter': 500,              # NOTE: tried 1000 no improvement
             'verbose': False
