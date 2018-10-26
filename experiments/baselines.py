@@ -37,6 +37,11 @@ class Baseline(object):
         best_method = None
         results = []
 
+        random_iters = None
+        if '_random_iters' in params:
+            random_iters = params['_random_iters']
+            del params['_random_iters']
+
         const_params = dict()
         search_params = []
         for k, v in params.items():
@@ -56,6 +61,9 @@ class Baseline(object):
             search_params = [[('__dummy__', None)]]
 
         grid = list(itertools.product(*search_params))
+        if random_iters is not None:
+            random.shuffle(grid)
+            grid = grid[:random_iters]
 
         for index, cur_params in enumerate(grid):
             if verbose:
