@@ -7,6 +7,7 @@ from experiments.utils import make_sure_path_exists
 import pytorch_tcorex
 import argparse
 import json
+import numpy as np
 
 
 def main():
@@ -60,6 +61,18 @@ def main():
             'tol': 1e-3,
             'verbose': 1,
             'max_iter': 100
+        }),
+
+        (baselines.LTGL(name='LTGL'), {
+            'alpha': 3.0,
+            'tau': 30.0,
+            'beta': 30.0,
+            'psi': 'l1',
+            'eta': 3.0,
+            'phi': 'l1',
+            'rho': 1.0 / np.sqrt(args.train_cnt),
+            'max_iter': 500,
+            'verbose': False
         })
     ]
 
