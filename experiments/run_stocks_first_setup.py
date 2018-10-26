@@ -205,14 +205,14 @@ def main():
         }),
 
         (baselines.LTGL(name='LTGL'), {
-            'alpha': [3.0, 10.0, 30.0, 1e2],
-            'tau': [30.0, 100.0, 300.0, 1e3, 3e3],
-            'beta': [1.0, 3.0, 10.0, 30.0, 100.0],
+            'alpha': [0.3, 1.0, 3.0, 10.0],
+            'tau': [30.0, 100.0, 300.0, 1e3],
+            'beta': [10.0, 30.0, 100.0],
             'psi': 'l1',
-            'eta': [1.0, 3.0, 10.0],
+            'eta': [0.3, 1.0, 3.0],
             'phi': 'l1',
             'rho': 1.0 / np.sqrt(args.train_cnt),
-            'max_iter': 500,  # NOTE: tried 1000 no improvement
+            'max_iter': 100,  # NOTE: tried 1000 no improvement
             'verbose': False
         }),
 
