@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--output_dir', type=str, default='experiments/results/')
     parser.add_argument('--left', type=int, default=0)
     parser.add_argument('--right', type=int, default=-2)
+    parser.add_argument('--seed', type=int, default=42)
     parser.set_defaults(commodities=False)
     parser.set_defaults(log_return=True)
     args = parser.parse_args()
@@ -39,7 +40,8 @@ def main():
     ''' Load data '''
     train_data, val_data, test_data, _, _ = load_sp500(
         train_cnt=args.train_cnt, val_cnt=args.val_cnt, test_cnt=args.test_cnt, commodities=args.commodities,
-        log_return=args.log_return, start_date=args.start_date, end_date=args.end_date, noise_var=args.noise_var)
+        log_return=args.log_return, start_date=args.start_date, end_date=args.end_date, noise_var=args.noise_var,
+        seed=args.seed)
 
     # take last nt time steps
     nv = train_data[0].shape[-1]
@@ -51,13 +53,13 @@ def main():
     # gamma --- eps means samples only from the current bucket, while 1-eps means all samples
     tcorex_gamma_range = None
     if 0 < args.train_cnt <= 16:
-        tcorex_gamma_range = [0.3, 0.4, 0.5, 0.6, 0.7]
+        tcorex_gamma_range = [0.5, 0.6, 0.7, 0.8, 0.9]
     if 16 < args.train_cnt <= 32:
-        tcorex_gamma_range = [0.1, 0.3, 0.4, 0.5, 0.6]
+        tcorex_gamma_range = [0.4, 0.5, 0.6, 0.7, 0.8]
     if 32 < args.train_cnt <= 64:
-        tcorex_gamma_range = [1e-9, 0.1, 0.3, 0.4, 0.5]
+        tcorex_gamma_range = [0.1, 0.2, 0.3, 0.4, 0.5]
     elif 64 < args.train_cnt:
-        tcorex_gamma_range = [1e-9, 0.1, 0.3]
+        tcorex_gamma_range = [1e-9, 0.1, 0.2]
 
     n_hidden_grid = [16, 32, 64, 128]
 
@@ -212,7 +214,7 @@ def main():
             'eta': [0.3, 1.0, 3.0],
             'phi': 'l1',
             'rho': 1.0 / np.sqrt(args.train_cnt),
-            'max_iter': 100,  # NOTE: tried 1000 no improvement
+            'max_iter': 1000,  # NOTE: tried 1000 no improvement
             'verbose': False
         }),
 

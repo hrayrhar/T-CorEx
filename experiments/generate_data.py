@@ -214,12 +214,12 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
 
 
 def load_sp500(train_cnt, val_cnt, test_cnt, nt=None, start_date='2000-01-01', end_date='2018-01-01',
-               commodities=False, log_return=True, noise_var=1e-4, return_index=False):
+               commodities=False, log_return=True, noise_var=1e-4, return_index=False, seed=42):
     """ Loads S&P 500 data (optionally with commodity prices).
     If nt is None, all time windows will be returned, otherwise only the last nt time windows will be returned.
     """
-    np.random.seed(42)
-    random.seed(42)
+    np.random.seed(seed)
+    random.seed(seed)
 
     # load S&P 500 data
     data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
