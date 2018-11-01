@@ -639,22 +639,6 @@ class LTGL(Baseline):
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return covs, None
 
-    def timeit(self, train_data, params):
-        start_time = time.time()
-        train_data = np.array(train_data)  # expects 3D data
-        ltgl = LatentTimeGraphLasso(alpha=params['alpha'],
-                                    tau=params['tau'],
-                                    beta=params['beta'],
-                                    psi=params['psi'],
-                                    eta=params['eta'],
-                                    phi=params['phi'],
-                                    rho=params['rho'],
-                                    max_iter=params['max_iter'],
-                                    verbose=params['verbose'])
-        ltgl.fit(train_data)
-        finish_time = time.time()
-        return finish_time - start_time
-
 
 class LVGLASSO(Baseline):
     def __init__(self, **kwargs):
@@ -680,15 +664,3 @@ class LVGLASSO(Baseline):
         if verbose:
             print("\tElapsed time {:.1f}s".format(finish_time - start_time))
         return covs, None
-
-    def timeit(self, train_data, params):
-        start_time = time.time()
-        for X in train_data:
-            lvglasso = LatentGraphLasso(alpha=params['alpha'],
-                                        tau=params['tau'],
-                                        rho=params['rho'],
-                                        max_iter=params['max_iter'],
-                                        verbose=params['verbose'])
-            lvglasso.fit(X)
-        finish_time = time.time()
-        return finish_time - start_time
