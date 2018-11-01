@@ -213,7 +213,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
     return data, ground_truth
 
 
-def load_sp500(train_cnt, val_cnt, test_cnt, nt=None, start_date='2000-01-01', end_date='2018-01-01',
+def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='2018-01-01',
                commodities=False, log_return=True, noise_var=1e-4, return_index=False, seed=42):
     """ Loads S&P 500 data (optionally with commodity prices).
     If nt is None, all time windows will be returned, otherwise only the last nt time windows will be returned.
@@ -244,7 +244,8 @@ def load_sp500(train_cnt, val_cnt, test_cnt, nt=None, start_date='2000-01-01', e
     df = df[['symbol', 'close']]
     df = df.pivot_table(index=df.index, columns='symbol', values='close')
     df = df[(df.index >= start_date) & (df.index <= end_date)]  # select the period
-    df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    # df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    df = df.dropna(axis=1, thresh=int(0.95 * len(df)))  # eliminate columns that are mostly empty
     df = df.fillna(method='ffill')  # forward fill missing dates
 
     if log_return:
