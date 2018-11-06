@@ -19,7 +19,7 @@ def main():
     parser.add_argument('--bs', type=int, help='block size')
     parser.add_argument('--train_cnt', default=16, type=int, help='number of train samples')
     parser.add_argument('--val_cnt', default=16, type=int, help='number of validation samples')
-    parser.add_argument('--test_cnt', default=128, type=int, help='number of test samples')
+    parser.add_argument('--test_cnt', default=1000, type=int, help='number of test samples')
     parser.add_argument('--snr', type=float, default=5.0, help='signal to noise ratio')
     parser.add_argument('--min_std', type=float, default=0.25, help='minimum x-std')
     parser.add_argument('--max_std', type=float, default=4.0, help='maximum x-std')
