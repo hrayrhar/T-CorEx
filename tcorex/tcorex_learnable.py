@@ -1,14 +1,8 @@
-""" T-CorEx - Linear Time Covariance Estimation method based on Linear CorEx.
-Given time-series data returns the covariance matrix for each time period.
-More details coming soon ...
-Code below written by:
-Hrayr Harutyunyan (harhro@gmail.edu) and Greg Ver Steeg (gregv@isi.edu).
-"""
-
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+from tcorex.base import to_numpy
 from tcorex.base import TCorexBase
 from tcorex.corex import Corex
 import numpy as np
@@ -17,24 +11,28 @@ import random
 import torch
 
 
-class TCorex(TCorexBase):
-    def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5,
-                 max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
+def entropy(x):
+    return -(x * torch.log(x)).sum(dim=0)
+
+
+class TCorexLearnable(TCorexBase):
+    def __init__(self, l1=0.0, l2=0.0, entropy_lamb=0.2, reg_type='W',
+                 init=True, max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
         """
-        :param gamma: parameter that controls the decay of weights.
-                      weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
-                      If gamma is equal to 1 all samples will be used with weight 1.
         :parm max_sample_cnt: maximum number of samples to use. Setting this to smaller values will give some speed up.
         """
-        super(TCorex, self).__init__(**kwargs)
+        super(TCorexLearnable, self).__init__(**kwargs)
         self.l1 = l1
         self.l2 = l2
+        self.entropy_lamb = entropy_lamb
         self.reg_type = reg_type
         self.init = init
-        self.gamma = np.float(gamma)
         self.max_sample_count = max_sample_cnt
         self.weighted_obj = weighted_obj
+
         self.window_len = None  # this depends on x and will be computed in fit()
+        self.sample_weights = None
+        self.theta = [None] * self.nt
 
         # define the weights of the model
         if (not self.init) and (self.pretrained_weights is None):
@@ -43,17 +41,52 @@ class TCorex(TCorexBase):
                 wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
                 wt = torch.tensor(wt, dtype=torch.float, device=self.device, requires_grad=True)
                 self.ws.append(wt)
+            self.transfer_weights()
 
     def forward(self, x_wno, anneal_eps, indices=None):
-        # copy x_wno
-        x_wno = [xt.copy() for xt in x_wno]
+        x_wno = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
+
+        # compute normalized sample weights
+        norm_sample_weights = []
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            sw = []
+            for i in range(l, r):
+                cur_ns = x_wno[i].shape[0]
+                sw.append(self.sample_weights[t][i-l] * torch.ones((cur_ns,), dtype=torch.float, device=self.device))
+            sw = torch.cat(sw, dim=0)
+            sw = sw.softmax(dim=0)
+            sw = sw.reshape((-1, 1))
+            norm_sample_weights.append(sw)
+
+        # normalize x_wno
+        means = []
+        stds = []
+        for t in range(self.nt):
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            x_part = torch.cat(x_wno[l:r], dim=0)
+            weights = norm_sample_weights[t]
+            mean = (weights * x_part).sum(dim=0)
+            variance = (weights * (x_part - mean.reshape((1, self.nv))) ** 2).sum(dim=0)
+            std = torch.sqrt(variance)
+            means.append(mean)
+            stds.append(std)
+
+        for t in range(self.nt):
+            x_wno[t] = (x_wno[t] - means[t].reshape((1, self.nv))) / stds[t].reshape((1, self.nv))
+            self.theta[t] = to_numpy(means[t]), to_numpy(stds[t])
+
         # add annealing noise
+        anneal_eps = torch.tensor(anneal_eps, dtype=torch.float, device=self.device)
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            anneal_noise = np.random.normal(size=(ns, self.nv))
-            x_wno[t] = np.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
-        self.x = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
+            anneal_noise = torch.tensor(np.random.normal(size=(ns, self.nv)), dtype=torch.float, device=self.device)
+            x_wno[t] = torch.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
+        self.x = x_wno
 
+        # compute z
         self.z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
@@ -72,28 +105,13 @@ class TCorex(TCorexBase):
         for t in range(self.nt):
             l = max(0, t - self.window_len[t])
             r = min(self.nt, t + self.window_len[t] + 1)
-            weights = []
-            left_t = t
-            right_t = t
-            for i in range(l, r):
-                cur_ns = x_wno[i].shape[0]
-                coef = np.power(self.gamma, np.abs(i - t))
-                # skip if the importance is too low
-                if coef < 1e-6:
-                    continue
-                left_t = min(left_t, i)
-                right_t = max(right_t, i)
-                weights.append(torch.tensor(coef * np.ones((cur_ns,)), dtype=torch.float, device=self.device))
+            weights = norm_sample_weights[t]
 
-            weights = torch.cat(weights, dim=0)
-            weights = weights / torch.sum(weights)
-            weights = weights.reshape((-1, 1))
-
-            t_range = (left_t, right_t)
+            t_range = (l, r)
             if t_range in concats:
                 x_all = concats[t_range]
             else:
-                x_all = torch.cat(self.x[left_t:right_t+1], dim=0)
+                x_all = torch.cat(self.x[l:r], dim=0)
                 concats[t_range] = x_all
             ns_tot = x_all.shape[0]
 
@@ -123,6 +141,7 @@ class TCorex(TCorexBase):
             # v_xi | z conditional mean
             outer_term = (1 / (1 + ri)).reshape((1, self.nv))
             inner_term_1 = R / torch.clamp(1 - R ** 2, epsilon, 1) / torch.sqrt(z2).reshape((self.m, 1))  # (m, nv)
+            # NOTE: we use z[t], but seems only for objective not for the covariance estimate
             inner_term_2 = Z  # (ns, m)
             cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
@@ -172,11 +191,16 @@ class TCorex(TCorexBase):
             l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
             self.reg_obj = self.reg_obj + self.l2 * l2_reg
 
-        self.total_obj = self.main_obj + self.reg_obj
+        # self.entropy_obj = sum([entropy(sw) for sw in norm_sample_weights])
+        self.entropy_obj = -sum([torch.max(sw) for sw in norm_sample_weights])
+        self.entropy_obj = -self.entropy_lamb * self.entropy_obj / self.nt
+
+        self.total_obj = self.main_obj + self.reg_obj + self.entropy_obj
 
         return {'total_obj': self.total_obj,
                 'main_obj': self.main_obj,
                 'reg_obj': self.reg_obj,
+                'entropy_obj': self.entropy_obj,
                 'objs': self.objs,
                 'sigma': self.sigma}
 
@@ -191,36 +215,17 @@ class TCorex(TCorexBase):
             window_len[i] = k
         self.window_len = window_len
 
-        # Use the priors to estimate <X_i> and std(x_i) better
-        self.theta = [None] * self.nt
+        # define sample weights
+        self.sample_weights = []
         for t in range(self.nt):
-            sum_weights = 0.0
-            l = max(0, t - window_len[t])
-            r = min(self.nt, t + window_len[t] + 1)
-            for i in range(l, r):
-                w = np.power(self.gamma, np.abs(i - t))
-                sum_weights += x[i].shape[0] * w
+            l = max(0, t - self.window_len[t])
+            r = min(self.nt, t + self.window_len[t] + 1)
+            self.sample_weights.append(torch.tensor(np.zeros((r - l,)), dtype=torch.float,
+                                                    device=self.device, requires_grad=True))
+        self.add_params = self.sample_weights  # used in _train_loop()
 
-            mean_prior = np.zeros((self.nv,))
-            for i in range(l, r):
-                w = np.power(self.gamma, np.abs(i - t))
-                for sample in x[i]:
-                    mean_prior += w * np.array(sample)
-            mean_prior /= sum_weights
-
-            var_prior = np.zeros((self.nv,))
-            for i in range(l, r):
-                w = np.power(self.gamma, np.abs(i - t))
-                for sample in x[i]:
-                    var_prior += w * ((np.array(sample) - mean_prior) ** 2)
-            var_prior /= sum_weights
-            std_prior = np.sqrt(var_prior)
-
-            self.theta[t] = (mean_prior, std_prior)
-
-        x = self.preprocess(x, fit=False)  # standardize the data using the better estimates
         x = [np.array(xt, dtype=np.float32) for xt in x]  # convert to np.float32
-        self.x_input = x  # to have an access to input
+        self.x_input = x  # have an access to input
 
         # initialize weights using the weighs of the linear CorEx trained on all data
         if self.init:
