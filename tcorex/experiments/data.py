@@ -384,3 +384,40 @@ def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01'
     print("\ttest  shape:", test_data.shape)
 
     return train_data, val_data, test_data, symbols, countries
+
+
+def make_buckets(ts_data, window, stride):
+    """ Divide time series data into buckets.
+    Returns the bucketed data plus a map that maps original indices into bucket indices.
+    """
+    ts_data = np.array(ts_data)
+    nt = len(ts_data)
+
+    if stride == 'one':
+        shift = 1
+    elif stride == 'half':
+        shift = window // 2
+    elif stride == 'full':
+        shift = window
+    else:
+        raise ValueError("Unknown value for stride")
+
+    start_indices = range(0, nt - window + 1, shift)
+    bucketed_data = []
+    midpoints = []
+    for i, start in enumerate(start_indices):
+        end = start + window
+        if i == len(start_indices) - 1 and end != nt:  # if the last bucket doesn't include the rightmost sample
+            end = nt
+        bucketed_data.append(np.array(ts_data[start:end]))
+        midpoints.append((start + end - 1.0) / 2.0)
+
+    index_to_bucket = []
+    for i in range(nt):
+        best = 0
+        for j in range(len(midpoints)):
+            if np.abs(i - midpoints[j]) < np.abs(i - midpoints[best]):
+                best = j
+        index_to_bucket.append(best)
+
+    return bucketed_data, index_to_bucket
