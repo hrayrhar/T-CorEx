@@ -4,8 +4,8 @@ from __future__ import absolute_import
 
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
-from experiments import utils
-from regain.covariance import LatentTimeGraphLasso, LatentGraphLasso
+from tcorex.covariance import calculate_nll_score
+from tcorex.experiments.data import make_buckets
 
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
@@ -84,7 +84,7 @@ class Baseline(object):
                     assert 'stride' in cur_params
                     cur_window = cur_params.pop('window')
                     cur_stride = cur_params.pop('stride')
-                    bucketed_train_data, index_to_bucket = utils.make_buckets(train_data, cur_window, cur_stride)
+                    bucketed_train_data, index_to_bucket = make_buckets(train_data, cur_window, cur_stride)
                     (cur_covs, cur_method) = self._train(bucketed_train_data, cur_params, verbose)
                     if cur_covs is not None:
                         cur_covs = [cur_covs[index_to_bucket[i]] for i in range(len(train_data))]
@@ -92,7 +92,7 @@ class Baseline(object):
                     cur_params['stride'] = cur_stride
                 else:
                     (cur_covs, cur_method) = self._train(train_data, cur_params, verbose)
-                cur_score = utils.calculate_nll_score(data=val_data, covs=cur_covs)
+                cur_score = calculate_nll_score(data=val_data, covs=cur_covs)
             except Exception as e:
                 print("Failed to train and evaluate method: {}, message: {}".format(self.name, str(e)))
                 cur_score = None
@@ -127,7 +127,7 @@ class Baseline(object):
         assert self._trained
         if verbose:
             print("Evaluating {} ...".format(self.name))
-        nll = utils.calculate_nll_score(data=test_data, covs=self._covs)
+        nll = calculate_nll_score(data=test_data, covs=self._covs)
         if verbose:
             print("\tScore: {:.4f}".format(nll))
         return nll
@@ -146,7 +146,7 @@ class Baseline(object):
 class GroundTruth(Baseline):
     def __init__(self, covs, test_data, **kwargs):
         super(GroundTruth, self).__init__(**kwargs)
-        self._score = utils.calculate_nll_score(data=test_data, covs=covs)
+        self._score = calculate_nll_score(data=test_data, covs=covs)
         self._covs = covs
         self._trained = True
 
@@ -618,6 +618,7 @@ class LTGL(Baseline):
         super(LTGL, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        from regain.covariance import LatentTimeGraphLasso
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -648,6 +649,7 @@ class LVGLASSO(Baseline):
         super(LVGLASSO, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        from regain.covariance import LatentGraphLasso
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()

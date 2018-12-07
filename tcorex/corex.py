@@ -2,7 +2,6 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from tcorex.experiments.misc import make_sure_path_exists
 from scipy.stats import norm, rankdata
 from tcorex import base
 import numpy as np
@@ -24,14 +23,13 @@ def get_u_from_w(corex):
 
 
 class Corex:
-    def __init__(self, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True, missing_values=None,
+    def __init__(self, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
                  gaussianize='standard', y_scale=1.0, l1=0.0, device='cpu', verbose=0):
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
         self.max_iter = max_iter  # Number of iterations to try
         self.tol = tol  # Threshold for convergence
         self.anneal = anneal
-        self.eps = 0  # If anneal is True, it's adjusted during optimization to avoid local minima
         self.missing_values = missing_values
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
@@ -110,20 +108,36 @@ class Corex:
 
         for i_eps, eps in enumerate(anneal_schedule):
             start_time = time.time()
-            self.eps = eps
+
+            history = []
+            last_iter = 0
 
             for i_loop in range(self.max_iter):
-                # TODO: write a stopping condition
-                if self.verbose:
-                    print("annealing eps: {}, iter: {} / {}".format(eps, i_loop, self.max_iter), end='\r')
-
                 obj = self.forward(x, eps)['obj']
+                history.append(base.to_numpy(obj))
+                last_iter = i_loop
 
                 optimizer.zero_grad()
                 obj.backward()
                 optimizer.step()
 
-            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
+                # Stopping criterion
+                # NOTE: this parameter can be tuned probably
+                K = 50
+                delta = 1.0
+                if len(history) >= 2*K:
+                    prev_mean = np.mean(history[-2*K:-K])
+                    cur_mean = np.mean(history[-K:])
+                    delta = np.abs(prev_mean - cur_mean) / np.abs(prev_mean + 1e-6)
+                if delta < self.tol:
+                    break
+
+                if self.verbose > 0:
+                    print("eps: {}, iter: {} / {}, obj: {:.4f}, delta: {:.6f}".format(
+                        eps, i_loop, self.max_iter, history[-1], delta), end='\r')
+
+            print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(last_iter+1,
+                                                                                  time.time() - start_time))
 
         # clear cache to free some GPU memory
         if self.device.type == 'cuda':

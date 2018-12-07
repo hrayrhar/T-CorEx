@@ -1,8 +1,6 @@
 """ T-CorEx - Linear Time Covariance Estimation method based on Linear CorEx.
 Given time-series data returns the covariance matrix for each time period.
 More details coming soon ...
-Code below written by:
-Hrayr Harutyunyan (harhro@gmail.edu) and Greg Ver Steeg (gregv@isi.edu).
 """
 
 from __future__ import print_function
@@ -44,7 +42,7 @@ class TCorex(TCorexBase):
                 wt = torch.tensor(wt, dtype=torch.float, device=self.device, requires_grad=True)
                 self.ws.append(wt)
 
-    def forward(self, x_wno, anneal_eps, indices=None):
+    def forward(self, x_wno, anneal_eps, indices=None, return_R=False):
         # copy x_wno
         x_wno = [xt.copy() for xt in x_wno]
         # add annealing noise
@@ -52,19 +50,20 @@ class TCorex(TCorexBase):
             ns = x_wno[t].shape[0]
             anneal_noise = np.random.normal(size=(ns, self.nv))
             x_wno[t] = np.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
-        self.x = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
+        x = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
 
-        self.z = [None] * self.nt
+        z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
             z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
-            z_mean = torch.mm(self.x[t], self.ws[t].t())
-            self.z[t] = z_mean + z_noise
+            z_mean = torch.mm(x[t], self.ws[t].t())
+            z[t] = z_mean + z_noise
 
         epsilon = 1e-8
-        self.objs = [None] * self.nt
-        self.sigma = [None] * self.nt
+        objs = [None] * self.nt
+        sigma = [None] * self.nt
         mi_xz = [None] * self.nt
+        Rs = [None] * self.nt
 
         # store all concatenations here for better memory usage
         concats = dict()
@@ -93,7 +92,7 @@ class TCorex(TCorexBase):
             if t_range in concats:
                 x_all = concats[t_range]
             else:
-                x_all = torch.cat(self.x[left_t:right_t+1], dim=0)
+                x_all = torch.cat(x[left_t:right_t+1], dim=0)
                 concats[t_range] = x_all
             ns_tot = x_all.shape[0]
 
@@ -107,12 +106,15 @@ class TCorex(TCorexBase):
             z2 = z2_all
             R = R_all
 
+            if return_R:
+                Rs[t] = R
+
             if self.weighted_obj:
                 X = x_all
                 Z = z_all
             else:
-                X = self.x[t]
-                Z = self.z[t]
+                X = x[t]
+                Z = z[t]
 
             if self.reg_type == 'MI':
                 mi_xz[t] = -0.5 * torch.log1p(-torch.clamp(R ** 2, 0, 1 - epsilon))
@@ -129,9 +131,9 @@ class TCorex(TCorexBase):
             # calculate normed covariance matrix if needed
             if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
                 inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
-                self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
+                sigma[t] = torch.mm(inner_mat.t(), inner_mat)
                 identity_matrix = torch.eye(self.nv, dtype=torch.float, device=self.device)
-                self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
+                sigma[t] = sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
             if self.weighted_obj:
@@ -141,44 +143,42 @@ class TCorex(TCorexBase):
                 obj_part_1 = 0.5 * torch.log(torch.clamp(((X - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(
                     dim=0)
             obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
-            self.objs[t] = obj_part_1 + obj_part_2
+            objs[t] = obj_part_1 + obj_part_2
 
         # experiments show that main_obj scales approximately linearly with nv
         # also it is a sum of over time steps, so we divide on (nt * nv)
-        self.main_obj = 1.0 / (self.nt * self.nv) * sum(self.objs)
+        main_obj = 1.0 / (self.nt * self.nv) * sum(objs)
 
         # regularization
         reg_matrices = [None] * self.nt
         if self.reg_type == 'W':
             reg_matrices = self.ws
-        if self.reg_type == 'WWT':
-            for t in range(self.nt):
-                reg_matrices[t] = torch.mm(self.ws[t].t(), self.ws[t])
         if self.reg_type == 'Sigma':
-            reg_matrices = self.sigma
+            reg_matrices = sigma
         if self.reg_type == 'MI':
             reg_matrices = mi_xz
 
-        self.reg_obj = torch.tensor(0.0, dtype=torch.float, device=self.device)
+        reg_obj = torch.tensor(0.0, dtype=torch.float, device=self.device)
 
         # experiments show that L1 and L2 regularizations scale approximately linearly with nv
         if self.l1 > 0:
             l1_reg = sum([torch.abs(reg_matrices[t + 1] - reg_matrices[t]).sum() for t in range(self.nt - 1)])
             l1_reg = 1.0 / (self.nt * self.nv) * l1_reg
-            self.reg_obj = self.reg_obj + self.l1 * l1_reg
+            reg_obj = reg_obj + self.l1 * l1_reg
 
         if self.l2 > 0:
             l2_reg = sum([((reg_matrices[t + 1] - reg_matrices[t]) ** 2).sum() for t in range(self.nt - 1)])
             l2_reg = 1.0 / (self.nt * self.nv) * l2_reg
-            self.reg_obj = self.reg_obj + self.l2 * l2_reg
+            reg_obj = reg_obj + self.l2 * l2_reg
 
-        self.total_obj = self.main_obj + self.reg_obj
+        total_obj = main_obj + reg_obj
 
-        return {'total_obj': self.total_obj,
-                'main_obj': self.main_obj,
-                'reg_obj': self.reg_obj,
-                'objs': self.objs,
-                'sigma': self.sigma}
+        return {'total_obj': total_obj,
+                'main_obj': main_obj,
+                'reg_obj': reg_obj,
+                'objs': objs,
+                'sigma': sigma,
+                'R': Rs}
 
     def fit(self, x):
         # Compute the window lengths for each time step and define the model
@@ -240,7 +240,7 @@ class TCorex(TCorexBase):
                 random.shuffle(data_concat)
                 data_concat = data_concat[:self.max_sample_count]
             lin_corex.fit(data_concat)
-            self.pretrained_weights = [lin_corex.weights] * self.nt
+            self.pretrained_weights = [lin_corex.get_weights()] * self.nt
             if self.verbose:
                 print("Initialization took {:.2f} seconds".format(time.time() - init_start))
 

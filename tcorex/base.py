@@ -61,7 +61,7 @@ def load(path):
 
 
 class TCorexBase(object):
-    def __init__(self, nt, nv, n_hidden=10, max_iter=10000, tol=1e-5, anneal=True,
+    def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True,
                  missing_values=None, gaussianize='standard', y_scale=1.0,
                  pretrained_weights=None, device='cpu', verbose=0):
         self.nt = nt  # Number of timesteps
@@ -70,7 +70,6 @@ class TCorexBase(object):
         self.max_iter = max_iter  # Number of iterations to try
         self.tol = tol  # Threshold for convergence
         self.anneal = anneal
-        self.eps = 0  # If anneal is True, it's adjusted during optimization to avoid local minima
         self.missing_values = missing_values
         self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
@@ -104,22 +103,39 @@ class TCorexBase(object):
 
         for eps in anneal_schedule:
             start_time = time.time()
-            self.eps = eps  # for Greg's part of code
+
+            history = []
+            last_iter = 0
+
             for i_loop in range(self.max_iter):
-                # TODO: write a stopping condition
                 ret = self.forward(self.x_input, eps)
                 obj = ret['total_obj']
+                history.append(to_numpy(obj))
+                last_iter = i_loop
 
                 optimizer.zero_grad()
                 obj.backward()
                 optimizer.step()
 
+                # Stopping criterion
+                # NOTE: this parameter can be tuned probably
+                K = 50
+                delta = 1.0
+                if len(history) >= 2 * K:
+                    prev_mean = np.mean(history[-2 * K:-K])
+                    cur_mean = np.mean(history[-K:])
+                    delta = np.abs(prev_mean - cur_mean) / np.abs(prev_mean + 1e-6)
+                if delta < self.tol:
+                    break
+
                 main_obj = ret['main_obj']
                 reg_obj = ret['reg_obj']
-                if self.verbose > 1:
-                    print("iter: {} / {}, obj: {:.4f}, main: {:.4f}, reg: {:.4f}, eps: {:.4f}".format(
-                        i_loop, self.max_iter, obj, main_obj, reg_obj, eps), end='\r')
-            print("Annealing iteration finished, time = {}".format(time.time() - start_time))
+                if self.verbose > 0:
+                    print("eps: {:.4f}, iter: {} / {}, obj: {:.4f}, main: {:.4f}, reg: {:.4f}, delta: {:.6f} ".format(
+                        eps, i_loop, self.max_iter, obj, main_obj, reg_obj, delta), end='\r')
+
+            print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(last_iter + 1,
+                                                                                  time.time() - start_time))
 
         # clear cache to free some GPU memory
         if self.device.type == 'cuda':
@@ -139,7 +155,7 @@ class TCorexBase(object):
     @property
     def mis(self):
         """ Returns I (Z_j : X_i) for each time period. """
-        R = self.forward(self.x_input, 0)['R']
+        R = self.forward(self.x_input, 0, return_R=True)['R']
         R = [to_numpy(rho) for rho in R]
         return [-0.5 * np.log1p(rho ** 2) for rho in R]
 
