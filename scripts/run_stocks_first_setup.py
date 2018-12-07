@@ -5,7 +5,7 @@ from __future__ import print_function
 from tcorex.experiments.data import load_sp500
 from tcorex.experiments.misc import make_sure_path_exists
 from tcorex.experiments import baselines
-from tcorex.tcorex import TCorex, TCorexLearnable
+from tcorex import TCorex, TCorexLearnable
 
 import numpy as np
 import argparse

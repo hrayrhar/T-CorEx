@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from scipy.io import savemat, loadmat
 from subprocess import Popen, PIPE
 from tcorex.covariance import calculate_nll_score
-from tcorex.experiments.data import make_buckets
+from .data import make_buckets
 
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov

@@ -1,7 +1,7 @@
 from tcorex.experiments.data import generate_nglf, make_buckets
 from tcorex.experiments import baselines
 from tcorex import base
-from tcorex.tcorex import TCorex
+from tcorex import TCorex
 
 
 def main():

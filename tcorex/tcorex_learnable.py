@@ -2,9 +2,9 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from tcorex.base import to_numpy
-from tcorex.base import TCorexBase
-from tcorex.corex import Corex
+from .base import to_numpy
+from .base import TCorexBase
+from .corex import Corex
 import numpy as np
 import time
 import random

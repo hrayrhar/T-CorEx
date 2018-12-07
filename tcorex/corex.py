@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import absolute_import
 
 from scipy.stats import norm, rankdata
-from tcorex import base
+from . import base
 import numpy as np
 import time
 import torch

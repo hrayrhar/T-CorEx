@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from tcorex.experiments.misc import make_sure_path_exists
+from .experiments.misc import make_sure_path_exists
 from scipy.stats import norm, rankdata
 import numpy as np
 import time
