@@ -13,10 +13,7 @@ import numpy as np
 from scipy.stats import norm, rankdata
 import time
 import random
-
 import torch
-
-dtype = torch.float
 
 
 def g(x, t=4):
@@ -86,9 +83,9 @@ class Corex:
 
         # define the weights of the model
         self.ws = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
-        self.ws = torch.tensor(self.ws, dtype=dtype, device=self.device, requires_grad=True)
+        self.ws = torch.tensor(self.ws, dtype=torch.float, device=self.device, requires_grad=True)
         # TODO: decide whether to use orthogonal initialization; do it for T-CorEx too
-        # self.ws = torch.zeros((self.m, self.nv), dtype=dtype, device=self.device, requires_grad=True)
+        # self.ws = torch.zeros((self.m, self.nv), dtype=torch.float, device=self.device, requires_grad=True)
         # self.ws = torch.nn.init.orthogonal_(self.ws, gain=1.0/np.sqrt(self.nv))
         self.transfer_weights()
 
@@ -99,13 +96,13 @@ class Corex:
             self.weights = self.ws.data.cpu().numpy()
 
     def forward(self, x_wno, anneal_eps):
-        x_wno = torch.tensor(x_wno, dtype=dtype, device=self.device)
-        anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
+        x_wno = torch.tensor(x_wno, dtype=torch.float, device=self.device)
+        anneal_eps = torch.tensor(anneal_eps, dtype=torch.float, device=self.device)
 
         ns = x_wno.shape[0]
-        anneal_noise = torch.randn((ns, self.nv), dtype=dtype, device=self.device)
+        anneal_noise = torch.randn((ns, self.nv), dtype=torch.float, device=self.device)
         x = torch.sqrt(1 - anneal_eps ** 2) * x_wno + anneal_eps * anneal_noise
-        z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
+        z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
         z_mean = torch.mm(x, self.ws.t())
         z = z_mean + z_noise
 
@@ -124,7 +121,7 @@ class Corex:
         # objective
         obj_part_1 = 0.5 * torch.log(torch.clamp(((x - cond_mean) ** 2).mean(dim=0), epsilon, np.inf)).sum(dim=0)
         obj_part_2 = 0.5 * torch.log(z2).sum(dim=0)
-        reg_obj = torch.tensor(0, dtype=dtype, device=self.device)
+        reg_obj = torch.tensor(0, dtype=torch.float, device=self.device)
         if self.l1 > 0:
             reg_obj = torch.sum(self.l1 * torch.abs(self.ws))
 
@@ -173,7 +170,7 @@ class Corex:
         self.moments = self._calculate_moments(x, self.weights, quick=False)
         order = np.argsort(-self.moments["TCs"])  # Largest TC components first.
         self.weights = self.weights[order]
-        self.ws.data = torch.tensor(self.weights, dtype=dtype, device=self.device)
+        self.ws.data = torch.tensor(self.weights, dtype=torch.float, device=self.device)
         self._update_u(x)
         self.moments = self._calculate_moments(x, self.weights, quick=False)
 
@@ -387,7 +384,7 @@ class TCorexBase(object):
         if self.pretrained_weights is not None:
             self.ws = []
             for pre_w in self.pretrained_weights:
-                self.ws.append(torch.tensor(pre_w, dtype=dtype, device=self.device, requires_grad=True))
+                self.ws.append(torch.tensor(pre_w, dtype=torch.float, device=self.device, requires_grad=True))
             self.transfer_weights()
 
         # set up the optimizer
@@ -642,7 +639,7 @@ class TCorex(TCorexBase):
             self.ws = []
             for t in range(self.nt):
                 wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
-                wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
+                wt = torch.tensor(wt, dtype=torch.float, device=self.device, requires_grad=True)
                 self.ws.append(wt)
             self.transfer_weights()
         self.add_params = []  # used in _train_loop()
@@ -655,12 +652,12 @@ class TCorex(TCorexBase):
             ns = x_wno[t].shape[0]
             anneal_noise = np.random.normal(size=(ns, self.nv))
             x_wno[t] = np.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
-        self.x = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
+        self.x = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
 
         self.z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
+            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
             z_mean = torch.mm(self.x[t], self.ws[t].t())
             self.z[t] = z_mean + z_noise
 
@@ -686,7 +683,7 @@ class TCorex(TCorexBase):
                     continue
                 left_t = min(left_t, i)
                 right_t = max(right_t, i)
-                weights.append(torch.tensor(coef * np.ones((cur_ns,)), dtype=dtype, device=self.device))
+                weights.append(torch.tensor(coef * np.ones((cur_ns,)), dtype=torch.float, device=self.device))
 
             weights = torch.cat(weights, dim=0)
             weights = weights / torch.sum(weights)
@@ -701,7 +698,7 @@ class TCorex(TCorexBase):
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())
-            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=dtype, device=self.device)
+            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=torch.float, device=self.device)
             z_all = z_all_mean + z_all_noise
             z2_all = ((z_all ** 2) * weights).sum(dim=0)  # (m,)
             R_all = torch.mm((z_all * weights).t(), x_all)  # m, nv
@@ -733,7 +730,7 @@ class TCorex(TCorexBase):
             if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
                 inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
                 self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
-                identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
+                identity_matrix = torch.eye(self.nv, dtype=torch.float, device=self.device)
                 self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
@@ -762,7 +759,7 @@ class TCorex(TCorexBase):
         if self.reg_type == 'MI':
             reg_matrices = mi_xz
 
-        self.reg_obj = torch.tensor(0.0, dtype=dtype, device=self.device)
+        self.reg_obj = torch.tensor(0.0, dtype=torch.float, device=self.device)
 
         # experiments show that L1 and L2 regularizations scale approximately linearly with nv
         if self.l1 > 0:
@@ -875,12 +872,12 @@ class TCorexLearnable(TCorexBase):
             self.ws = []
             for t in range(self.nt):
                 wt = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
-                wt = torch.tensor(wt, dtype=dtype, device=self.device, requires_grad=True)
+                wt = torch.tensor(wt, dtype=torch.float, device=self.device, requires_grad=True)
                 self.ws.append(wt)
             self.transfer_weights()
 
     def forward(self, x_wno, anneal_eps, indices=None):
-        x_wno = [torch.tensor(xt, dtype=dtype, device=self.device) for xt in x_wno]
+        x_wno = [torch.tensor(xt, dtype=torch.float, device=self.device) for xt in x_wno]
 
         # compute normalized sample weights
         norm_sample_weights = []
@@ -890,7 +887,7 @@ class TCorexLearnable(TCorexBase):
             sw = []
             for i in range(l, r):
                 cur_ns = x_wno[i].shape[0]
-                sw.append(self.sample_weights[t][i-l] * torch.ones((cur_ns,), dtype=dtype, device=self.device))
+                sw.append(self.sample_weights[t][i-l] * torch.ones((cur_ns,), dtype=torch.float, device=self.device))
             sw = torch.cat(sw, dim=0)
             sw = sw.softmax(dim=0)
             sw = sw.reshape((-1, 1))
@@ -926,10 +923,10 @@ class TCorexLearnable(TCorexBase):
                 self.x_std.append(x_wno[t].data.cpu().numpy())
 
         # add annealing noise
-        anneal_eps = torch.tensor(anneal_eps, dtype=dtype, device=self.device)
+        anneal_eps = torch.tensor(anneal_eps, dtype=torch.float, device=self.device)
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            anneal_noise = torch.tensor(np.random.normal(size=(ns, self.nv)), dtype=dtype, device=self.device)
+            anneal_noise = torch.tensor(np.random.normal(size=(ns, self.nv)), dtype=torch.float, device=self.device)
             x_wno[t] = torch.sqrt(1 - anneal_eps ** 2) * x_wno[t] + anneal_eps * anneal_noise
         self.x = x_wno
 
@@ -937,7 +934,7 @@ class TCorexLearnable(TCorexBase):
         self.z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=dtype, device=self.device)
+            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
             z_mean = torch.mm(self.x[t], self.ws[t].t())
             self.z[t] = z_mean + z_noise
 
@@ -963,7 +960,7 @@ class TCorexLearnable(TCorexBase):
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())
-            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=dtype, device=self.device)
+            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=torch.float, device=self.device)
             z_all = z_all_mean + z_all_noise
             z2_all = ((z_all ** 2) * weights).sum(dim=0)  # (m,)
             R_all = torch.mm((z_all * weights).t(), x_all)  # m, nv
@@ -996,7 +993,7 @@ class TCorexLearnable(TCorexBase):
             if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
                 inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
                 self.sigma[t] = torch.mm(inner_mat.t(), inner_mat)
-                identity_matrix = torch.eye(self.nv, dtype=dtype, device=self.device)
+                identity_matrix = torch.eye(self.nv, dtype=torch.float, device=self.device)
                 self.sigma[t] = self.sigma[t] * (1 - identity_matrix) + identity_matrix
 
             # objective
@@ -1025,7 +1022,7 @@ class TCorexLearnable(TCorexBase):
         if self.reg_type == 'MI':
             reg_matrices = mi_xz
 
-        self.reg_obj = torch.tensor(0.0, dtype=dtype, device=self.device)
+        self.reg_obj = torch.tensor(0.0, dtype=torch.float, device=self.device)
 
         # experiments show that L1 and L2 regularizations scale approximately linearly with nv
         if self.l1 > 0:
@@ -1067,7 +1064,7 @@ class TCorexLearnable(TCorexBase):
         for t in range(self.nt):
             l = max(0, t - self.window_len[t])
             r = min(self.nt, t + self.window_len[t] + 1)
-            self.sample_weights.append(torch.tensor(np.zeros((r - l,)), dtype=dtype,
+            self.sample_weights.append(torch.tensor(np.zeros((r - l,)), dtype=torch.float,
                                                     device=self.device, requires_grad=True))
         self.add_params = self.sample_weights  # used in _train_loop()
 

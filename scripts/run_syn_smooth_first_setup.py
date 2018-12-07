@@ -2,11 +2,12 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
-from experiments.generate_data import *
-from experiments.utils import make_sure_path_exists
-from pytorch_tcorex import *
-from experiments import baselines
+from tcorex.experiments.data import load_nglf_smooth_change
+from tcorex.experiments.misc import make_sure_path_exists
+from tcorex.experiments import baselines
+from tcorex.tcorex import TCorex, TCorexLearnable
 
+import numpy as np
 import argparse
 import json
 import os

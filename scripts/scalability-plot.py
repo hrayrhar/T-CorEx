@@ -1,10 +1,10 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
-from experiments.generate_data import load_nglf_sudden_change
-from experiments import baselines
-from experiments.utils import make_sure_path_exists
-import pytorch_tcorex
+from tcorex.experiments.data import load_nglf_sudden_change
+from tcorex.experiments import baselines
+from tcorex.experiments.misc import make_sure_path_exists
+from tcorex import tcorex
 import argparse
 import json
 import numpy as np
@@ -29,7 +29,7 @@ def main():
             'lengthOfSlice': args.train_cnt,
         }),
 
-        (baselines.TCorex(tcorex=pytorch_tcorex.TCorex, name='T-Corex (pytorch, cpu)'), {
+        (baselines.TCorex(tcorex=tcorex.TCorex, name='T-Corex (pytorch, cpu)'), {
             'max_iter': 100,
             'anneal': True,
             'l1': 0.1,
@@ -39,7 +39,7 @@ def main():
             'torch_device': 'cpu'
         }),
 
-        (baselines.TCorex(tcorex=pytorch_tcorex.TCorex, name='T-Corex (pytorch, cuda)'), {
+        (baselines.TCorex(tcorex=tcorex.TCorex, name='T-Corex (pytorch, cuda)'), {
             'max_iter': 100,
             'anneal': True,
             'l1': 0.1,
