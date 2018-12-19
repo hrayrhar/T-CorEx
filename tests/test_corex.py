@@ -1,40 +1,47 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+from tcorex.covariance import calculate_nll_score
+from tcorex import Corex
+from tqdm import tqdm
 import numpy as np
 import linearcorex
-import pytorch_tcorex
-import generate_data
-import metric_utils
-import time
+import os
 
 
-def test_linear_corex_pytorch():
+def test_corex():
     r""" Test pytorch linear CorEx implementation.
     Check if the performance of pytorch CorEx matches that of standard CorEx.
     """
+    print("=" * 100)
+    print("Testing PyTorch Linear CorEx ...")
 
-    # take some data
-    data, _ = generate_data.generate_nglf(nv=128, m=8, nt=1, ns=32)
-    data = data[0]
+    # load data
+    resources = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'resources')
+    data_file = os.path.join(resources, 'test_corex_data.npy')
+    data = np.load(data_file)
     print("Data is loaded, shape = {}".format(data.shape))
 
-    # train standard linear CorEx
-    start_time = time.time()
-    standard_corex = linearcorex.Corex(n_hidden=8, max_iter=500)
-    standard_corex.fit(data)
-    standard_corex_cov = standard_corex.get_covariance()
-    standard_corex_score = metric_utils.calculate_nll_score(data=[data], covs=[standard_corex_cov])
-    print("Standard CorEx training finished:\n\tscore: {:.2f}\n\ttime: {:.2f}\n\tTC: {:.2f}".format(
-        standard_corex_score, time.time() - start_time, standard_corex.tc))
+    # train linear corex
+    lc_scores = []
+    for i in tqdm(range(5)):
+        X = data[32 * i: 32 * (i + 1)]
+        lc = linearcorex.Corex(n_hidden=8, max_iter=500, verbose=0)
+        lc.fit(X)
+        covs = lc.get_covariance()
+        cur_score = calculate_nll_score(data=[X], covs=[covs])
+        lc_scores.append(cur_score)
 
-    # train pytorch linear CorEx
-    start_time = time.time()
-    pytorch_corex = pytorch_tcorex.Corex(nv=128, n_hidden=8, max_iter=1000, torch_device='cuda')
-    pytorch_corex.fit(data)
-    pytorch_corex_cov = pytorch_corex.get_covariance()
-    pytorch_corex_score = metric_utils.calculate_nll_score(data=[data], covs=[pytorch_corex_cov])
-    print("Pytorch CorEx training finished:\n\tscore: {:.2f}\n\ttime: {:.2f}\n\tTC: {:.2f}".format(
-        pytorch_corex_score, time.time() - start_time, pytorch_corex.tc))
+    # train pytorch corex
+    pylc_scores = []
+    for i in tqdm(range(5)):
+        X = data[32 * i: 32 * (i + 1)]
+        lc = Corex(nv=128, n_hidden=8, max_iter=1000, verbose=0)
+        lc.fit(X)
+        covs = lc.get_covariance()
+        cur_score = calculate_nll_score(data=[X], covs=[covs])
+        pylc_scores.append(cur_score)
 
-    assert np.abs(standard_corex_score - pytorch_corex_score) < 0.01 * np.abs(standard_corex_score)
+    lc_mean = np.mean(lc_scores)
+    pylc_mean = np.mean(pylc_scores)
+    assert (pylc_mean - lc_mean) / (np.abs(lc_mean) + 1e-6) < 0.01

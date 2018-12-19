@@ -42,7 +42,7 @@ class TCorex(TCorexBase):
                 wt = torch.tensor(wt, dtype=torch.float, device=self.device, requires_grad=True)
                 self.ws.append(wt)
 
-    def forward(self, x_wno, anneal_eps, indices=None, return_R=False):
+    def forward(self, x_wno, anneal_eps, indices=None, return_factorization=False, return_R=False):
         # copy x_wno
         x_wno = [xt.copy() for xt in x_wno]
         # add annealing noise
@@ -64,6 +64,7 @@ class TCorex(TCorexBase):
         sigma = [None] * self.nt
         mi_xz = [None] * self.nt
         Rs = [None] * self.nt
+        factorization = [None] * self.nt
 
         # store all concatenations here for better memory usage
         concats = dict()
@@ -129,8 +130,11 @@ class TCorex(TCorexBase):
             cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
             # calculate normed covariance matrix if needed
-            if ((indices is not None) and (t in indices)) or self.reg_type == 'Sigma':
+            need_sigma = (((indices is not None) and (t in indices)) or self.reg_type == 'Sigma')
+            if need_sigma or return_factorization:
                 inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
+                factorization[t] = inner_mat
+            if need_sigma:
                 sigma[t] = torch.mm(inner_mat.t(), inner_mat)
                 identity_matrix = torch.eye(self.nv, dtype=torch.float, device=self.device)
                 sigma[t] = sigma[t] * (1 - identity_matrix) + identity_matrix
@@ -178,7 +182,8 @@ class TCorex(TCorexBase):
                 'reg_obj': reg_obj,
                 'objs': objs,
                 'sigma': sigma,
-                'R': Rs}
+                'R': Rs,
+                'factorization': factorization}
 
     def fit(self, x):
         # Compute the window lengths for each time step and define the model
@@ -224,7 +229,7 @@ class TCorex(TCorexBase):
 
         # initialize weights using the weighs of the linear CorEx trained on all data
         if self.init:
-            if self.verbose:
+            if self.verbose > 0:
                 print("Initializing with weights of a linear CorEx learned on whole data")
             init_start = time.time()
             lin_corex = Corex(nv=self.nv,
@@ -241,7 +246,7 @@ class TCorex(TCorexBase):
                 data_concat = data_concat[:self.max_sample_count]
             lin_corex.fit(data_concat)
             self.pretrained_weights = [lin_corex.get_weights()] * self.nt
-            if self.verbose:
+            if self.verbose > 0:
                 print("Initialization took {:.2f} seconds".format(time.time() - init_start))
 
         return self._train_loop()

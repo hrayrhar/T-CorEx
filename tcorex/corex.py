@@ -24,7 +24,7 @@ def get_u_from_w(corex):
 
 class Corex:
     def __init__(self, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', y_scale=1.0, l1=0.0, device='cpu', verbose=0):
+                 gaussianize='standard', y_scale=1.0, l1=0.0, device='cpu', stopping_len=50, verbose=0):
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
         self.max_iter = max_iter  # Number of iterations to try
@@ -35,19 +35,17 @@ class Corex:
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
         self.l1 = l1  # L1 on W regularization coefficient
         self.device = torch.device(device)
+        self.stopping_len = stopping_len
         self.verbose = verbose
-        if verbose:
+        if verbose > 0:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
 
         # define the weights of the model
         self.ws = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
         self.ws = torch.tensor(self.ws, dtype=torch.float, device=self.device, requires_grad=True)
-        # TODO: decide whether to use orthogonal initialization; do it for T-CorEx too
-        # self.ws = torch.zeros((self.m, self.nv), dtype=torch.float, device=self.device, requires_grad=True)
-        # self.ws = torch.nn.init.orthogonal_(self.ws, gain=1.0/np.sqrt(self.nv))
 
-    def forward(self, x_wno, anneal_eps, compute_sigma=False):
+    def forward(self, x_wno, anneal_eps, return_sigma=False, return_factorization=False):
         x_wno = torch.tensor(x_wno, dtype=torch.float, device=self.device)
         anneal_eps = torch.tensor(anneal_eps, dtype=torch.float, device=self.device)
 
@@ -71,8 +69,13 @@ class Corex:
         cond_mean = outer_term * torch.mm(inner_term_2, inner_term_1)  # (ns, nv)
 
         sigma = None
-        if compute_sigma:
+        factorization = None
+
+        if return_sigma or return_factorization:
             inner_mat = 1.0 / (1 + ri).reshape((1, self.nv)) * R / torch.clamp(1 - R ** 2, epsilon, 1)
+            factorization = inner_mat
+
+        if return_sigma:
             sigma = torch.mm(inner_mat.t(), inner_mat)
             identity_matrix = torch.eye(self.nv, dtype=torch.float, device=self.device)
             sigma = sigma * (1 - identity_matrix) + identity_matrix
@@ -91,7 +94,8 @@ class Corex:
                 'reg_obj': reg_obj,
                 'z2': z2,
                 'R': R,
-                'sigma': sigma}
+                'sigma': sigma,
+                'factorization': factorization}
 
     def fit(self, x):
         x = np.asarray(x, dtype=np.float32)
@@ -122,8 +126,7 @@ class Corex:
                 optimizer.step()
 
                 # Stopping criterion
-                # NOTE: this parameter can be tuned probably
-                K = 50
+                K = self.stopping_len
                 delta = 1.0
                 if len(history) >= 2*K:
                     prev_mean = np.mean(history[-2*K:-K])
@@ -132,12 +135,13 @@ class Corex:
                 if delta < self.tol:
                     break
 
-                if self.verbose > 0:
+                if self.verbose > 1:
                     print("eps: {}, iter: {} / {}, obj: {:.4f}, delta: {:.6f}".format(
                         eps, i_loop, self.max_iter, history[-1], delta), end='\r')
 
-            print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(last_iter+1,
-                                                                                  time.time() - start_time))
+            if self.verbose > 0:
+                print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(
+                    last_iter+1, time.time() - start_time))
 
         # clear cache to free some GPU memory
         if self.device.type == 'cuda':
@@ -187,7 +191,7 @@ class Corex:
                 std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / self.n_obs).clip(1e-10)
                 self.theta = (mean, std)
             x = ((x - self.theta[0]) / self.theta[1])
-            if np.max(np.abs(x)) > 6 and self.verbose:
+            if np.max(np.abs(x)) > 6 and self.verbose > 0:
                 print("Warning: outliers more than 6 stds away from mean. Consider using gaussianize='outliers'")
         elif self.gaussianize == 'outliers':
             if fit:
@@ -201,7 +205,7 @@ class Corex:
         return x
 
     def get_covariance(self, normed=False):
-        sigma = self.forward(self.x_input, 0)['sigma']
+        sigma = self.forward(self.x_input, 0, compute_sigma=True)['sigma']
         sigma = base.to_numpy(sigma)
         if normed:
             return sigma

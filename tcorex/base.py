@@ -63,7 +63,7 @@ def load(path):
 class TCorexBase(object):
     def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True,
                  missing_values=None, gaussianize='standard', y_scale=1.0,
-                 pretrained_weights=None, device='cpu', verbose=0):
+                 pretrained_weights=None, device='cpu', stopping_len=50, verbose=0):
         self.nt = nt  # Number of timesteps
         self.nv = nv  # Number of variables
         self.m = n_hidden  # Number of latent factors to learn
@@ -75,19 +75,20 @@ class TCorexBase(object):
         self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
         self.pretrained_weights = pretrained_weights
         self.device = torch.device(device)
+        self.stopping_len = stopping_len
         self.verbose = verbose
-        if verbose:
+        if verbose > 0:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
         self.add_params = []  # used in _train_loop()
 
-    def forward(self, x_wno, anneal_eps, indices=None):
+    def forward(self, x_wno, anneal_eps, indices=None, return_factorization=False, **kwargs):
         raise NotImplementedError("forward function should be specified for all child classes")
 
     def _train_loop(self):
         """ train loop expects self have one variable x_input
         """
-        if self.verbose:
+        if self.verbose > 0:
             print("Starting the training loop ...")
         # set the annealing schedule
         anneal_schedule = [0.]
@@ -119,7 +120,7 @@ class TCorexBase(object):
 
                 # Stopping criterion
                 # NOTE: this parameter can be tuned probably
-                K = 50
+                K = self.stopping_len
                 delta = 1.0
                 if len(history) >= 2 * K:
                     prev_mean = np.mean(history[-2 * K:-K])
@@ -130,12 +131,13 @@ class TCorexBase(object):
 
                 main_obj = ret['main_obj']
                 reg_obj = ret['reg_obj']
-                if self.verbose > 0:
+                if self.verbose > 1:
                     print("eps: {:.4f}, iter: {} / {}, obj: {:.4f}, main: {:.4f}, reg: {:.4f}, delta: {:.6f} ".format(
                         eps, i_loop, self.max_iter, obj, main_obj, reg_obj, delta), end='\r')
 
-            print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(last_iter + 1,
-                                                                                  time.time() - start_time))
+            if self.verbose > 0:
+                print("Annealing iteration finished, iters: {}, time: {:.2f}s".format(
+                    last_iter + 1, time.time() - start_time))
 
         # clear cache to free some GPU memory
         if self.device.type == 'cuda':
@@ -200,7 +202,7 @@ class TCorexBase(object):
                     std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / n_obs).clip(1e-10)
                     self.theta.append((mean, std))
                 x = ((x - self.theta[t][0]) / self.theta[t][1])
-                if np.max(np.abs(x)) > 6 and self.verbose:
+                if np.max(np.abs(x)) > 6 and self.verbose > 0:
                     warnings.append("Warning: outliers more than 6 stds away from mean. "
                                     "Consider using gaussianize='outliers'")
             elif self.gaussianize == 'outliers':
@@ -230,6 +232,14 @@ class TCorexBase(object):
         if self.device.type == 'cuda':
             torch.cuda.empty_cache()
         return cov
+
+    def get_factorization(self):
+        ret = self.forward(self.x_input, anneal_eps=0, return_factorization=True)['factorization']
+        for t in range(self.nt):
+            ret[t] = to_numpy(ret[t])
+        if self.device.type == 'cuda':
+            torch.cuda.empty_cache()
+        return ret
 
     def load_weights(self, weights):
         self.ws = [torch.tensor(w, dtype=torch.float, device=self.device, requires_grad=True)
