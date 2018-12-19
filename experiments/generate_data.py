@@ -112,7 +112,8 @@ def generate_general(nv, m, ns, normalize=False, shuffle=False):
                 sigma_perm[i, j] = sigma[perm[i], perm[j]]
         sigma = sigma_perm
 
-    return np.random.multivariate_normal(myu, sigma, size=(ns,)), sigma
+    mu = np.zeros((nv, ))
+    return np.random.multivariate_normal(mu, sigma, size=(ns,)), sigma
 
 
 def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
@@ -245,7 +246,7 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='
     df = df.pivot_table(index=df.index, columns='symbol', values='close')
     df = df[(df.index >= start_date) & (df.index <= end_date)]  # select the period
     # df = df.dropna(axis=1, how='all')  # eliminate blank columns
-    df = df.dropna(axis=1, thresh=int(0.95 * len(df)))  # eliminate columns that are mostly empty
+    df = df.dropna(axis=1, thresh=int(0.95 * len(df)))  # keep the columns that are mostly present
     df = df.fillna(method='ffill')  # forward fill missing dates
 
     if log_return:
@@ -308,11 +309,11 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='
 
 
 def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='2018-01-01',
-                           log_return=True, noise_var=1e-4):
+                           log_return=True, noise_var=1e-4, return_index=False, seed=42):
     """ Loads full trading economics data.
     """
-    np.random.seed(42)
-    random.seed(42)
+    np.random.seed(seed)
+    random.seed(seed)
 
     # load trading economics data all stocks
     data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
@@ -324,9 +325,10 @@ def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01'
     df = df[['symbol', 'close']]
     df = df.pivot_table(index=df.index, columns='symbol', values='close')
     df = df[(df.index >= start_date) & (df.index <= end_date)]  # select the period
-    df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    # df = df.dropna(axis=1, how='all')  # eliminate blank columns
+    df = df.dropna(axis=1, thresh=int(0.05 * len(df)))  # require at least 5% present values
     df = df.fillna(method='ffill')  # forward fill missing dates
-    df = df.loc[:, (df < 1e-6).sum() == 0]  # drop columns for which there are negative values
+    df = df.drop(columns=df.columns[df.min() < 1e-6])
 
     if log_return:
         df = np.log(df).diff()[1:]
@@ -378,9 +380,11 @@ def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01'
     val_data += np.sqrt(noise_var) * np.random.normal(size=val_data.shape)
     test_data += np.sqrt(noise_var) * np.random.normal(size=test_data.shape)
 
-    print('S&P 500 data is loaded:')
+    print('Trading economics is loaded:')
     print('\ttrain shape:', train_data.shape)
     print('\tval   shape:', val_data.shape)
     print("\ttest  shape:", test_data.shape)
 
+    if return_index:
+        return train_data, val_data, test_data, symbols, countries, df.index
     return train_data, val_data, test_data, symbols, countries
