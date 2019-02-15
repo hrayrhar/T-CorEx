@@ -44,4 +44,5 @@ def test_corex():
 
     lc_mean = np.mean(lc_scores)
     pylc_mean = np.mean(pylc_scores)
+    print("pylc score: {:.4f}, lc score: {:.4f}".format(pylc_mean, lc_mean))
     assert (pylc_mean - lc_mean) / (np.abs(lc_mean) + 1e-6) < 0.01

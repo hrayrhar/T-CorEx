@@ -36,7 +36,7 @@ def main():
             'gamma': 0.8,
             'reg_type': 'W',
             'init': True,
-            'torch_device': 'cpu'
+            'device': 'cpu'
         }),
 
         (baselines.TCorex(tcorex=TCorex, name='T-Corex (pytorch, cuda)'), {
@@ -46,7 +46,7 @@ def main():
             'gamma': 0.8,
             'reg_type': 'W',
             'init': True,
-            'torch_device': 'cuda'
+            'device': 'cuda'
         }),
 
         (baselines.QUIC(name='QUIC'), {
@@ -80,7 +80,7 @@ def main():
     for method, params in methods:
         times[method.name] = []
 
-    out_file = 'experiments/scalability/{}nt{}.train_cnt{}.json'.format(args.prefix, args.nt, args.train_cnt)
+    out_file = 'outputs/scalability/{}nt{}.train_cnt{}.json'.format(args.prefix, args.nt, args.train_cnt)
     make_sure_path_exists(out_file)
     print("Output file path = {}".format(out_file))
 

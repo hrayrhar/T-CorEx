@@ -343,7 +343,7 @@ class TimeVaryingGraphLasso(Baseline):
         super(TimeVaryingGraphLasso, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
-        from experiments.methods.TVGL import TVGL
+        from tcorex.experiments.methods.TVGL import TVGL
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -375,7 +375,7 @@ class TimeVaryingGraphLasso(Baseline):
 
     def timeit(self, train_data, params):
         # need to write special timeit() to exclude the time spent for linalg.inv()
-        from experiments.methods.TVGL import TVGL
+        from tcorex.experiments.methods.TVGL import TVGL
         start_time = time.time()
 
         # if data is 3D (nt, ns, nv), make it 2D (nt * ns, nv)
@@ -430,7 +430,7 @@ class QUIC(Baseline):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
-        os.chdir('experiments/methods/QUIC')
+        os.chdir('tcorex/experiments/methods/QUIC')
 
         # create exp_id.m file to execute QUIC
         exp_id = random.randint(0, 2 ** 64)
@@ -466,7 +466,7 @@ class QUIC(Baseline):
         os.remove('{}.in.mat'.format(exp_id))
         os.remove('{}.out.mat'.format(exp_id))
         os.remove('{}.m'.format(exp_id))
-        os.chdir('../../..')
+        os.chdir('../../../../')
 
         finish_time = time.time()
         if verbose:
@@ -475,7 +475,7 @@ class QUIC(Baseline):
 
     def timeit(self, train_data, params):
         start_time = time.time()
-        os.chdir('experiments/methods/QUIC')
+        os.chdir('tcorex/experiments/methods/QUIC')
 
         # create exp_id.m file to execute QUIC
         exp_id = random.randint(0, 2 ** 64)
@@ -503,7 +503,7 @@ class QUIC(Baseline):
         os.remove('{}.in.mat'.format(exp_id))
         os.remove('{}.out.mat'.format(exp_id))
         os.remove('{}.m'.format(exp_id))
-        os.chdir('../../..')
+        os.chdir('../../../..')
 
         finish_time = time.time()
         return finish_time - start_time
@@ -517,7 +517,7 @@ class BigQUIC(Baseline):
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
-        os.chdir('experiments/methods/BigQUIC/bigquic')
+        os.chdir('tcorex/experiments/methods/BigQUIC/bigquic')
 
         exp_id = random.randint(0, 2 ** 64)
         covs = []
@@ -566,7 +566,7 @@ class BigQUIC(Baseline):
         os.remove('{}.in.txt'.format(exp_id))
         os.remove('{}.out.txt'.format(exp_id))
         os.remove('{}.sh'.format(exp_id))
-        os.chdir('../../../../')
+        os.chdir('../../../../../')
 
         finish_time = time.time()
         if verbose:
@@ -575,7 +575,7 @@ class BigQUIC(Baseline):
 
     def timeit(self, train_data, params):
         start_time = time.time()
-        os.chdir('experiments/methods/BigQUIC/bigquic')
+        os.chdir('tcorex/experiments/methods/BigQUIC/bigquic')
 
         exp_id = random.randint(0, 2 ** 64)
         for X in train_data:
@@ -604,7 +604,7 @@ class BigQUIC(Baseline):
         os.remove('{}.in.txt'.format(exp_id))
         os.remove('{}.out.txt'.format(exp_id))
         os.remove('{}.sh'.format(exp_id))
-        os.chdir('../../../../')
+        os.chdir('../../../../../')
 
         finish_time = time.time()
         return finish_time - start_time

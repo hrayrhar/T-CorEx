@@ -3,12 +3,9 @@
 Time-Varying version of [Linear CorEx](https://arxiv.org/abs/1706.03353).
 
 ## Requiremenets
-* Python 2 or Python 3 (Python 2 is well tested)
 * numpy, scipy, sklearn, PyTorch
-* Linear CorEx
-    * `pip install linearcorex`
 * (Optional) nibabel, nilearn  (for fMRI experiments)
-* (Optional) nose, tqdm (for tests)
+* (Optional) nose, tqdm, linearcorex (for tests)
 * (Optional) regain, TVGL (for running comparisons)
 
 ## Description
