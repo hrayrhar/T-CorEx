@@ -1,4 +1,4 @@
-""" Reimplementation of linear CorEx in PyTorch.
+""" Reimplementation of linear CorEx in PyTorch (https://arxiv.org/abs/1706.03353).
 """
 from __future__ import print_function
 from __future__ import division
@@ -25,17 +25,31 @@ def get_u_from_w(corex):
 
 
 class Corex:
+    """ PyTorch implementation of Linear CorEx (https://arxiv.org/abs/1706.03353).
+    """
     def __init__(self, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', y_scale=1.0, l1=0.0, device='cpu', stopping_len=50, verbose=0):
-        self.nv = nv  # Number of variables
-        self.m = n_hidden  # Number of latent factors to learn
-        self.max_iter = max_iter  # Number of iterations to try
-        self.tol = tol  # Threshold for convergence
+                 gaussianize='standard', l1=0.0, device='cpu', stopping_len=50, verbose=0):
+        """
+        :param nv: int, number of observed variables
+        :param n_hidden: int, number of latent factors
+        :param max_iter: int, maximum number of iterations to train in each annealing step
+        :param tol: float, threshold for checking convergence
+        :param anneal: boolean, whether to use annealing or not
+        :param missing_values: float or None, value used for imputing missing values. None indicates imputing means.
+        :param gaussianize: str, 'none', 'standard', 'outliers', or 'empirical'. Specifies to normalize the data.
+        :param l1: float, l1 regularization on weights of the model.
+        :param device: str, 'cpu' or 'cuda'. The device parameter passed to PyTorch.
+        :param stopping_len: int, the length of history used for detecting convergence.
+        :param verbose: 0, 1, or 2. Specifies the verbosity level.
+        """
+        self.nv = nv
+        self.m = n_hidden
+        self.max_iter = max_iter
+        self.tol = tol
         self.anneal = anneal
         self.missing_values = missing_values
-        self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
-        self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
-        self.l1 = l1  # L1 on W regularization coefficient
+        self.gaussianize = gaussianize
+        self.l1 = l1
         self.device = torch.device(device)
         self.stopping_len = stopping_len
         self.verbose = verbose
@@ -47,6 +61,10 @@ class Corex:
         self.ws = np.random.normal(loc=0, scale=1.0 / np.sqrt(self.nv), size=(self.m, self.nv))
         self.ws = torch.tensor(self.ws, dtype=torch.float, device=self.device, requires_grad=True)
 
+        # initialize later
+        self.x_input = None
+        self.theta = None
+
     def forward(self, x_wno, anneal_eps, return_sigma=False, return_factorization=False):
         x_wno = torch.tensor(x_wno, dtype=torch.float, device=self.device)
         anneal_eps = torch.tensor(anneal_eps, dtype=torch.float, device=self.device)
@@ -54,7 +72,7 @@ class Corex:
         ns = x_wno.shape[0]
         anneal_noise = torch.randn((ns, self.nv), dtype=torch.float, device=self.device)
         x = torch.sqrt(1 - anneal_eps ** 2) * x_wno + anneal_eps * anneal_noise
-        z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
+        z_noise = torch.randn((ns, self.m), dtype=torch.float, device=self.device)
         z_mean = torch.mm(x, self.ws.t())
         z = z_mean + z_noise
 
@@ -128,11 +146,10 @@ class Corex:
                 optimizer.step()
 
                 # Stopping criterion
-                K = self.stopping_len
                 delta = 1.0
-                if len(history) >= 2*K:
-                    prev_mean = np.mean(history[-2*K:-K])
-                    cur_mean = np.mean(history[-K:])
+                if len(history) >= 2 * self.stopping_len:
+                    prev_mean = np.mean(history[-2*self.stopping_len:-self.stopping_len])
+                    cur_mean = np.mean(history[-self.stopping_len:])
                     delta = np.abs(prev_mean - cur_mean) / np.abs(prev_mean + 1e-6)
                 if delta < self.tol:
                     break
@@ -160,12 +177,12 @@ class Corex:
         R = base.to_numpy(R)
         return -0.5 * np.log1p(R ** 2)
 
-    def clusters(self, type='MI'):
+    def clusters(self, cluster_type='MI'):
         """ Get clusters of variables.
-        :param type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
-                     In case of W, the cluster is defined as argmax_j |W_{j,i}|
+        :param cluster_type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
+                             In case of W, the cluster is defined as argmax_j |W_{j,i}|
         """
-        if type == 'W':
+        if cluster_type == 'W':
             return np.abs(self.get_weights()).argmax(axis=0)
         return self.mis.argmax(axis=0)
 
@@ -181,16 +198,16 @@ class Corex:
         'outliers' tries to squeeze in the outliers
         Any other choice will skip the transformation."""
         if self.missing_values is not None:
-            x, self.n_obs = base.mean_impute(x, self.missing_values)  # Creates a copy
+            x, n_obs = base.mean_impute(x, self.missing_values)  # Creates a copy
         else:
-            self.n_obs = len(x)
+            n_obs = len(x)
         if self.gaussianize == 'none':
             pass
         elif self.gaussianize == 'standard':
             if fit:
                 mean = np.mean(x, axis=0)
                 # std = np.std(x, axis=0, ddof=0).clip(1e-10)
-                std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / self.n_obs).clip(1e-10)
+                std = np.sqrt(np.sum((x - mean) ** 2, axis=0) / n_obs).clip(1e-10)
                 self.theta = (mean, std)
             x = ((x - self.theta[0]) / self.theta[1])
             if np.max(np.abs(x)) > 6 and self.verbose > 0:
@@ -207,7 +224,7 @@ class Corex:
         return x
 
     def get_covariance(self, normed=False):
-        sigma = self.forward(self.x_input, 0, compute_sigma=True)['sigma']
+        sigma = self.forward(self.x_input, 0, return_sigma=True)['sigma']
         sigma = base.to_numpy(sigma)
         if normed:
             return sigma

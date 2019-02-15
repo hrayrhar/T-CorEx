@@ -4,38 +4,21 @@ Time-Varying version of [Linear CorEx](https://arxiv.org/abs/1706.03353).
 
 ## Requiremenets
 * numpy, scipy, sklearn, PyTorch
-* (Optional) nibabel, nilearn  (for fMRI experiments)
-* (Optional) nose, tqdm, linearcorex (for tests)
-* (Optional) regain, TVGL (for running comparisons)
+* [optional] nibabel (for fMRI experiments)
+* [optional] nose, tqdm (for tests)
+* [optional] regain, TVGL, linearcorex, pandas (for running comparisions)
 
 ## Description
 
-The main method is the class 'tcorex.TCorex'. It has the following parameters:
+The main method is the class 'tcorex.TCorex'. The description of its paramteres can be found in the docstring.
+While there are many hyperparameters, in general only a couple of them need to be tuned (others are set to their "best" values).
+Those parameters are:
 
-
-| parameter | description |
-|:---------|:---|
-|`nt`| number of time steps|
-| `nv`| number of variables of time series|
-| `n_hidden` | number of latent factors|
-| `max_iter` | how many iterations to train for each annealing step. 500 is usually enough.|
-| `tol`| value used in checking convergence. The default value works well.|
-| `anneal`| `True` or `False`. Whether to do annealing while training. The default value is `True`, which always works better than `False`.|
-| `missing_values`| what value to impute for missing values. It is better to do the imputation outside the method and put `None` for this parameter.|
-| `discourage_overlap` | The default is `True`. It always should be `True`.|
-| `gaussianize` | How to pre-process the data. Keep the default value.|
-| `gpu` | `True` or `False`. The default value is `False`.|
-| `y_scale`  | The default value is 1. No need to change.|
-| `update_iter` | Print some information after each `update_iter` iteration. Works when `verbose`=True. The default value is 10.|
-| `pretrained_weights` | This argument can be used to use pre-trained weights for each linear CorEx. The default value is `None`.|
-| `verbose` | `True` or `False`. The default value is `False`. In case of `True` the algorithm will print some information about training.|
-| `seed` | The seed of random number generators. The default is `None`.|
-| `l1` | A non-negative number specifying the weight of L1 temporal regularization.|
-| `l2` | A non-negative number specifying the weight of L2 temporal regularization. Use either `l1` or `l2`.|
-| `reg_type` | What to regularize. The default value is 'W', which works the best. It means to regularize  (W_{t+1} - W_t). |
-| `init` | `True` or `False`. The default is `True`. Whether to initialize the weights with the weights of a linear CorEx learnt on whole data. Setting this `True` is almost always helpful.|
-| `gamma` | Real number in [0,1]. This argument controls the weighs of different samples used for estimating some entities at time step t. The formula of weights is: weight_t(t') = gamma ^ (\| t' - t\|). If the time series are very dynamic the value of gamma should be lower.|
-| `weighted_obj` | `True` or `False`. Whether the objective for time step t uses the samples of other timesteps. The default is `False`.|
+| parameter | description |  
+|:---------|:---|  
+| `l1` | A non-negative real number specifying the coefficient of l1 temporal regularization.|  
+| `l2` | A non-negative real number specifying the coefficient of l2 temporal regularization.|  
+| `gamma` | Real number in [0,1]. This argument controls the sample weights. The samples of time period t' will have weight w_t(t')=gamma^(\|t'-t\|) when estimating quantities for time period t. Smaller values are used for very dynamic time series.|  
 
 
 ## Usage

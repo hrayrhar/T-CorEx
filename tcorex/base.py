@@ -63,18 +63,32 @@ def load(path):
 
 
 class TCorexBase(object):
-    def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True,
-                 missing_values=None, gaussianize='standard', y_scale=1.0,
-                 pretrained_weights=None, device='cpu', stopping_len=50, verbose=0):
-        self.nt = nt  # Number of timesteps
-        self.nv = nv  # Number of variables
-        self.m = n_hidden  # Number of latent factors to learn
-        self.max_iter = max_iter  # Number of iterations to try
-        self.tol = tol  # Threshold for convergence
+    """ Base class for all T-CorEx methods.
+    """
+    def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
+                 gaussianize='standard', pretrained_weights=None, device='cpu', stopping_len=50, verbose=0):
+        """
+        :param nt: int, number of time periods
+        :param nv: int, number of observed variables
+        :param n_hidden: int, number of latent factors
+        :param max_iter: int, maximum number of iterations to train in each annealing step
+        :param tol: float, threshold for checking convergence
+        :param anneal: boolean, whether to use annealing or not
+        :param missing_values: float or None, value used for imputing missing values. None indicates imputing means.
+        :param gaussianize: str, 'none', 'standard', 'outliers', or 'empirical'. Specifies to normalize the data.
+        :param pretrained_weights: None or list of numpy arrays. Pretrained weights.
+        :param device: str, 'cpu' or 'cuda'. The device parameter passed to PyTorch.
+        :param stopping_len: int, the length of history used for detecting convergence.
+        :param verbose: 0, 1, or 2. Specifies the verbosity level.
+        """
+        self.nt = nt
+        self.nv = nv
+        self.m = n_hidden
+        self.max_iter = max_iter
+        self.tol = tol
         self.anneal = anneal
         self.missing_values = missing_values
-        self.gaussianize = gaussianize  # Preprocess data: 'standard' scales to zero mean and unit variance
-        self.y_scale = y_scale  # Can be arbitrary, but sets the scale of Y
+        self.gaussianize = gaussianize
         self.pretrained_weights = pretrained_weights
         self.device = torch.device(device)
         self.stopping_len = stopping_len
@@ -83,6 +97,11 @@ class TCorexBase(object):
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
         self.add_params = []  # used in _train_loop()
+
+        # initialize later
+        self.x_input = None
+        self.theta = None
+        self.ws = None
 
     def forward(self, x_wno, anneal_eps, indices=None, return_factorization=False, **kwargs):
         raise NotImplementedError("forward function should be specified for all child classes")
@@ -122,11 +141,10 @@ class TCorexBase(object):
 
                 # Stopping criterion
                 # NOTE: this parameter can be tuned probably
-                K = self.stopping_len
                 delta = 1.0
-                if len(history) >= 2 * K:
-                    prev_mean = np.mean(history[-2 * K:-K])
-                    cur_mean = np.mean(history[-K:])
+                if len(history) >= 2 * self.stopping_len:
+                    prev_mean = np.mean(history[-2 * self.stopping_len:-self.stopping_len])
+                    cur_mean = np.mean(history[-self.stopping_len:])
                     delta = np.abs(prev_mean - cur_mean) / np.abs(prev_mean + 1e-6)
                 if delta < self.tol:
                     break
@@ -163,12 +181,12 @@ class TCorexBase(object):
         R = [to_numpy(rho) for rho in R]
         return [-0.5 * np.log1p(rho ** 2) for rho in R]
 
-    def clusters(self, type='MI'):
+    def clusters(self, cluster_type='MI'):
         """ Get clusters of variables for each time period.
-        :param type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
-                     In case of W, the cluster is defined as argmax_j |W_{j,i}|
+        :param cluster_type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
+                             In case of W, the cluster is defined as argmax_j |W_{j,i}|
         """
-        if type == 'W':
+        if cluster_type == 'W':
             return [np.abs(w).argmax(axis=0) for w in self.get_weights()]
         return [mi.argmax(axis=0) for mi in self.mis]
 

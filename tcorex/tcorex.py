@@ -16,15 +16,37 @@ import torch
 
 
 class TCorex(TCorexBase):
-    def __init__(self, l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5,
-                 max_sample_cnt=2 ** 30, weighted_obj=False, **kwargs):
+    """ Temporal Correlation Explanation.
+    """
+    def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
+                 gaussianize='standard', pretrained_weights=None, device='cpu', stopping_len=50, verbose=0,
+                 l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5, max_sample_cnt=2 ** 30, weighted_obj=False):
         """
-        :param gamma: parameter that controls the decay of weights.
-                      weight of a sample whose distance from the current time-step is d will have 1.0/(gamma^d).
-                      If gamma is equal to 1 all samples will be used with weight 1.
-        :parm max_sample_cnt: maximum number of samples to use. Setting this to smaller values will give some speed up.
+        :param nt: int, number of time periods
+        :param nv: int, number of observed variables
+        :param n_hidden: int, number of latent factors
+        :param max_iter: int, maximum number of iterations to train in each annealing step
+        :param tol: float, threshold for checking convergence
+        :param anneal: boolean, whether to use annealing or not
+        :param missing_values: float or None, value used for imputing missing values. None indicates imputing means.
+        :param gaussianize: str, 'none', 'standard', 'outliers', or 'empirical'. Specifies to normalize the data.
+        :param pretrained_weights: None or list of numpy arrays. Pretrained weights.
+        :param device: str, 'cpu' or 'cuda'. The device parameter passed to PyTorch.
+        :param stopping_len: int, the length of history used for detecting convergence.
+        :param verbose: 0, 1, or 2. Specifies the verbosity level.
+        :param l1: float, coefficient of l1 temporal regularization
+        :param l2: float, coefficient of l2 temporal regularization
+        :param reg_type: 'W', 'MI', or 'Sigma'. Which temporal regularization to use.
+        :param init: boolean, whether to initialize weights with linear CorEx weights trained on all samples.
+        :param gamma: float, [0-1), the decay rate of sample weights.
+        :param max_sample_cnt: maximum number of samples to use. Small values give speed up, possibly
+                               worsening the perforcmance.
+        :param weighted_obj: boolean, whether to use weighted objective.
         """
-        super(TCorex, self).__init__(**kwargs)
+        super(TCorex, self).__init__(nt=nt, nv=nv, n_hidden=n_hidden, max_iter=max_iter, tol=tol, anneal=anneal,
+                                     missing_values=missing_values, gaussianize=gaussianize,
+                                     pretrained_weights=pretrained_weights, device=device, stopping_len=stopping_len,
+                                     verbose=verbose)
         self.l1 = l1
         self.l2 = l2
         self.reg_type = reg_type
@@ -32,7 +54,9 @@ class TCorex(TCorexBase):
         self.gamma = np.float(gamma)
         self.max_sample_count = max_sample_cnt
         self.weighted_obj = weighted_obj
-        self.window_len = None  # this depends on x and will be computed in fit()
+
+        # initialize later
+        self.window_len = None
 
         # define the weights of the model
         if (not self.init) and (self.pretrained_weights is None):
@@ -55,7 +79,7 @@ class TCorex(TCorexBase):
         z = [None] * self.nt
         for t in range(self.nt):
             ns = x_wno[t].shape[0]
-            z_noise = self.y_scale * torch.randn((ns, self.m), dtype=torch.float, device=self.device)
+            z_noise = torch.randn((ns, self.m), dtype=torch.float, device=self.device)
             z_mean = torch.mm(x[t], self.ws[t].t())
             z[t] = z_mean + z_noise
 
@@ -98,7 +122,7 @@ class TCorex(TCorexBase):
             ns_tot = x_all.shape[0]
 
             z_all_mean = torch.mm(x_all, self.ws[t].t())
-            z_all_noise = self.y_scale * torch.randn((ns_tot, self.m), dtype=torch.float, device=self.device)
+            z_all_noise = torch.randn((ns_tot, self.m), dtype=torch.float, device=self.device)
             z_all = z_all_mean + z_all_noise
             z2_all = ((z_all ** 2) * weights).sum(dim=0)  # (m,)
             R_all = torch.mm((z_all * weights).t(), x_all)  # m, nv

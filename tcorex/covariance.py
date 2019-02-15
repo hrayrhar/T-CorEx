@@ -17,7 +17,7 @@ def calculate_nll_score(data, covs):
     return np.mean(nll)
 
 
-def diffs(matrices, ord='fro'):
+def diffs(matrices, norm='fro'):
     """ Computes the norms of differences of neighboring matrices.
     :param: matrices - list of matrices
     :param: ord - variable that will be passed to np.linalg.norm
@@ -25,7 +25,7 @@ def diffs(matrices, ord='fro'):
     nt = len(matrices)
     ret = []
     for t in range(nt - 1):
-        ret.append(np.linalg.norm(matrices[t] - matrices[t+1], ord=ord))
+        ret.append(np.linalg.norm(matrices[t] - matrices[t+1], ord=norm))
     return ret
 
 
@@ -117,11 +117,11 @@ def spectral_diffs_given_factors(factors):
     """
     B, d_inv = _compute_inverses(factors)
     nt = len(factors)
-    diffs = [None] * (nt-1)
+    diff = [None] * (nt-1)
     for t in range(nt - 1):
         print("Estimating norm of difference at time step: {}".format(t))
-        diffs[t] = _estimate_diff_norm(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
-    return diffs
+        diff[t] = _estimate_diff_norm(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
+    return diff
 
 
 def _compute_diff_norm_fro(A, d_1, B, d_2):
@@ -144,9 +144,8 @@ def frob_diffs_given_factors(factors):
     """
     B, d_inv = _compute_inverses(factors)
     nt = len(factors)
-    diffs = [None] * (nt-1)
+    diff = [None] * (nt-1)
     for t in range(nt - 1):
         print("Calculating Frobenius norm of difference at time step: {}".format(t))
-        diffs[t] = _compute_diff_norm_fro(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
-    return diffs
-
+        diff[t] = _compute_diff_norm_fro(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
+    return diff

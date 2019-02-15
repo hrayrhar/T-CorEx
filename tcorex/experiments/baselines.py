@@ -138,7 +138,7 @@ class Baseline(object):
 
     def timeit(self, train_data, params):
         start_time = time.time()
-        dummy = self._train(train_data, params, verbose=False)
+        _ = self._train(train_data, params, verbose=False)
         finish_time = time.time()
         return finish_time - start_time
 
@@ -383,12 +383,12 @@ class TimeVaryingGraphLasso(Baseline):
         if train_data.ndim == 3:
             train_data = train_data.reshape((-1, train_data.shape[-1]))
 
-        inv_bucket_covs = TVGL.TVGL(data=np.array(train_data),
-                                    lengthOfSlice=params['lengthOfSlice'],
-                                    lamb=params['lamb'],
-                                    beta=params['beta'],
-                                    indexOfPenalty=params['indexOfPenalty'],
-                                    max_iter=params['max_iter'])
+        _ = TVGL.TVGL(data=np.array(train_data),
+                      lengthOfSlice=params['lengthOfSlice'],
+                      lamb=params['lamb'],
+                      beta=params['beta'],
+                      indexOfPenalty=params['indexOfPenalty'],
+                      max_iter=params['max_iter'])
         finish_time = time.time()
         return finish_time - start_time
 
@@ -454,9 +454,9 @@ class QUIC(Baseline):
             # run created exp_id.m file and wait
             process = Popen(['octave', '{}.m'.format(exp_id)], stdout=PIPE, stderr=PIPE)
             process.wait()
-            if verbose:
+            if verbose > 1:
                 stdout, stderr = process.communicate()
-                # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
+                print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
 
             # collect outputs from exp_id.out.mat file
             outs = loadmat('{}.out.mat'.format(exp_id))
@@ -542,9 +542,9 @@ class BigQUIC(Baseline):
             # run created exp_id.m file and wait
             process = Popen(['bash', '{}.sh'.format(exp_id)], stdout=PIPE, stderr=PIPE)
             process.wait()
-            if verbose:
+            if verbose > 1:
                 stdout, stderr = process.communicate()
-                # print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
+                print("Stdout:\n{}\nStderr:\n{}".format(stdout, stderr))
 
             # collect outputs from exp_id.out.txt file
             nv = X.shape[1]

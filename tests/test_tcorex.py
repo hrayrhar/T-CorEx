@@ -33,6 +33,7 @@ def test_tcorex_on_synthetic_data():
 
     score_mean = np.mean(scores)
     need_score = 249.315542545698
+    print("score: {:.4f}, need score: {:.4f}".format(score_mean, need_score))
     assert (score_mean - need_score) / need_score < 0.01
 
 
@@ -49,7 +50,7 @@ def test_tcorex_real_data():
     test_data = data[:, 40:, :]
 
     scores = []
-    for i in tqdm(range(5)):
+    for _ in tqdm(range(5)):
         tc = TCorex(n_hidden=8, nv=train_data.shape[-1], nt=train_data.shape[0],
                     max_iter=500, anneal=True, l1=0.3, gamma=0.4, reg_type='W',
                     init=True, device='cpu', verbose=1)

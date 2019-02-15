@@ -20,7 +20,7 @@ def nglf_sufficient_params(nv, m, snr, min_std, max_std):
     snrs = np.random.uniform(0, snr, size=(nv,))
     rhos = np.sqrt(snrs / (snrs + 1.0))
     cor = cor_signs * rhos
-    par = [np.random.randint(0, m) for i in range(nv)]
+    par = [np.random.randint(0, m) for _ in range(nv)]
     return x_std, cor, par
 
 
@@ -57,7 +57,7 @@ def sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix=True):
                 cond_var = (x_std[i] ** 2) * (1 - cor[i] ** 2)
                 x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
             return x
-        data = np.array([generate_single() for i in range(ns)])
+        data = np.array([generate_single() for _ in range(ns)])
         return data, None
 
 
@@ -127,7 +127,6 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     :param snr:         Average signal to noise ratio (U[0, snr])
     :param min_std:     Minimum std of x_i
     :param max_std:     Maximum std of x_i
-    :param nglf:        Whether to use NGLF model
     :param shuffle:     Whether to shuffle to x_i's
     :param from_matrix: Whether to construct and return ground truth covariance matrices
                         Valid only when nglf=True
@@ -136,7 +135,7 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     :return: (train_data, val_data, test_data, ground_truth_covs)
     """
     # find segment lengths
-    segment_lens = [nt // n_segments for i in range(n_segments)]
+    segment_lens = [nt // n_segments for _ in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert (sum(segment_lens) == nt)
 
@@ -176,11 +175,11 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
     np.random.seed(seed)
 
     # find segment lengths and generate sets of sufficient parameters
-    segment_lens = [nt // n_segments for i in range(n_segments)]
+    segment_lens = [nt // n_segments for _ in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert(sum(segment_lens) == nt)
     nglfs = [nglf_sufficient_params(nv, m, snr, min_std, max_std)
-             for i in range(n_segments + 1)]
+             for _ in range(n_segments + 1)]
 
     # generate the data
     ground_truth = []
@@ -192,7 +191,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
         L = segment_lens[seg_id]
 
         # choose where to change the parent of each x_i
-        change_points = [np.random.randint(1, L) for i in range(nv)]
+        change_points = [np.random.randint(1, L) for _ in range(nv)]
 
         par = par_1
         for st in range(L):

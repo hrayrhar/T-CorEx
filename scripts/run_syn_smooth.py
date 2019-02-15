@@ -234,9 +234,10 @@ def main():
         })
     ]
 
-    exp_name = 'smooth_first_setup.{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}.snr{:.2f}.min_std{:.2f}.max_std{:.2f}.n_segments{}'.format(
-        args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt,
-        args.snr, args.min_std, args.max_std, args.n_segments)
+    exp_name = 'smooth_first_setup.{}.nt{}.m{}.bs{}.train_cnt{}.val_cnt{}.test_cnt{}'\
+               '.snr{:.2f}.min_std{:.2f}.max_std{:.2f}.n_segments{}'.format(
+                args.data_type, args.nt, args.m, args.bs, args.train_cnt, args.val_cnt, args.test_cnt,
+                args.snr, args.min_std, args.max_std, args.n_segments)
     exp_name = args.prefix + exp_name
 
     best_results_path = "{}.results.json".format(exp_name)

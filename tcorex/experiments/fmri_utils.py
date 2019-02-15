@@ -62,6 +62,7 @@ def plot_clusters_probabilistic(plotting, prob_clusters, coords, source_img):
     :param plotting: nilearn.plotting
     :param prob_clusters: (n_clusters, n_voxels)
     :param coords: (n_voxels, 3)
+    :param source_img: 3D background image
     :return:
     """
     X, Y, Z, T = source_img.shape
@@ -81,6 +82,7 @@ def plot_clusters(plotting, clusters, coords, source_img, output_file=None, figu
     :param plotting: nilearn.plotting
     :param clusters: (n_voxels,)
     :param coords: (n_voxels, 3)
+    :param source_img: 3D background image
     :param output_file: if given the plot is saved here
     :param figure: figure param to be passed to plotting.plot_roi function
     :return:
