@@ -49,6 +49,18 @@ def main():
             'device': 'cuda'
         }),
 
+        (baselines.LTGL(name='LTGL'), {
+            'alpha': 3.0,
+            'tau': 30.0,
+            'beta': 30.0,
+            'psi': 'l1',
+            'eta': 3.0,
+            'phi': 'l1',
+            'rho': 1.0 / np.sqrt(args.train_cnt),
+            'max_iter': 500,
+            'verbose': False
+        }),
+
         (baselines.QUIC(name='QUIC'), {
             'lamb': 0.1,
             'tol': 1e-6,
@@ -61,23 +73,11 @@ def main():
             'tol': 1e-3,
             'verbose': 1,
             'max_iter': 100
-        }),
-
-        (baselines.LTGL(name='LTGL'), {
-            'alpha': 3.0,
-            'tau': 30.0,
-            'beta': 30.0,
-            'psi': 'l1',
-            'eta': 3.0,
-            'phi': 'l1',
-            'rho': 1.0 / np.sqrt(args.train_cnt),
-            'max_iter': 500,
-            'verbose': False
         })
     ]
 
     times = {}
-    for method, params in methods:
+    for method, params in methods[:-2]:
         times[method.name] = []
 
     out_file = 'outputs/scalability/{}nt{}.train_cnt{}.json'.format(args.prefix, args.nt, args.train_cnt)
@@ -94,7 +94,7 @@ def main():
         data, _, = load_nglf_sudden_change(nv=nv, m=n_hidden, nt=args.nt, ns=args.train_cnt,
                                            shuffle=False, from_matrix=False)
 
-        for method, params in methods:
+        for method, params in methods[:-2]:
             # start timing
             print("{}\nTiming method: {}, nv: {}".format('-' * 80, method.name, nv))
 
