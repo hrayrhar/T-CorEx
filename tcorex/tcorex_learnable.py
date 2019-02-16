@@ -1,3 +1,6 @@
+""" Temporal Correlation Explanation with learnable sample weights.
+Given time-series data returns the covariance matrix for each time period.
+"""
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import

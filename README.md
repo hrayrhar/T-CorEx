@@ -1,12 +1,18 @@
 # T-CorEx
 
-Time-Varying version of [Linear CorEx](https://arxiv.org/abs/1706.03353).
+T-CorEx, Temporal Correlation Explanation, is designed for covariance estimation from temporal data.
+In its essense, T-CorEx trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
+while employing two regularization techniques to enforce temporal consistency of estimates.
+T-CorEx has linear time and memory complexity with respect to the number of observed variables and can be applied to
+truly high-dimensional datasets. It takes less than an hour on a moderate PC to estimate the covariance structure
+for time series with 100K variables. T-CorEx is implemented in PyTorch and can run on both CPUs and GPUs.
 
 ## Requiremenets
 * numpy, scipy, sklearn, PyTorch
 * [optional] nibabel (for fMRI experiments)
 * [optional] nose, tqdm (for tests)
 * [optional] regain, TVGL, linearcorex, pandas (for running comparisions)
+* [optional] matplotlib and nilearn (for visualizations)
 
 ## Description
 

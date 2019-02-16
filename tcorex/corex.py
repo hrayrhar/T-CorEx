@@ -1,4 +1,5 @@
 """ Reimplementation of linear CorEx in PyTorch (https://arxiv.org/abs/1706.03353).
+Some parts of the code are borrowed from https://github.com/gregversteeg/LinearCorex.
 """
 from __future__ import print_function
 from __future__ import division

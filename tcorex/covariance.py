@@ -6,7 +6,9 @@ import numpy as np
 
 
 def calculate_nll_score(data, covs):
-    """ Calculate negative log-likelihood of covariance estimates under data.
+    """ Calculate time-averaged negative log-likelihood.
+    :param data: 3d array or list of 2d arrays.
+    :param covs: list of covariance matrices.
     """
     nt = len(data)
     assert len(covs) == nt
@@ -19,8 +21,8 @@ def calculate_nll_score(data, covs):
 
 def diffs(matrices, norm='fro'):
     """ Computes the norms of differences of neighboring matrices.
-    :param: matrices - list of matrices
-    :param: ord - variable that will be passed to np.linalg.norm
+    :param matrices: list of matrices
+    :param ord: variable that will be passed to np.linalg.norm
     """
     nt = len(matrices)
     ret = []
@@ -63,9 +65,9 @@ def _diag_from_right(A, d):
 
 def _inverse(A, d):
     """ Compute inverse of A^T A + diag(d) faster than n^2.
-        A - (m, n)
-        d - (n,)
-        Return: V, d_inv such that inverse = d_inv - V^T V
+    :param A: (m, n)
+    :param d: (n,)
+    :return V, d_inv such that inverse = d_inv - V^T V
     """
     m, n = A.shape
     d_inv = 1 / d
@@ -79,7 +81,7 @@ def _inverse(A, d):
 def _compute_inverses(A):
     """ Given the low-rank parts of correlation matrices, compute low-rank + diagonal representation
     of inverse correlation matrices.
-    Returns: B, d_inv such that Sigma^{-1}_t = d_inv_t - B_t^T B_t
+    :return B, d_inv such that Sigma^{-1}_t = d_inv_t - B_t^T B_t
     """
     nt = len(A)
     d = [None] * nt

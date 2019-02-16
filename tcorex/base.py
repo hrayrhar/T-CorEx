@@ -1,4 +1,5 @@
 """ Base functions/classes for T-CorEx methods.
+Some parts of the code are borrowed from https://github.com/gregversteeg/LinearCorex.
 """
 from __future__ import print_function
 from __future__ import division

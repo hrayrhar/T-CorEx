@@ -9,7 +9,6 @@ from .data import make_buckets
 
 import sklearn.decomposition as sk_dec
 import sklearn.covariance as sk_cov
-import linearcorex
 import numpy as np
 import time
 import itertools
@@ -322,6 +321,7 @@ class LinearCorex(Baseline):
         super(LinearCorex, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import linearcorex
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
