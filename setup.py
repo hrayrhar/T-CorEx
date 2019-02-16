@@ -2,7 +2,7 @@ from setuptools import setup
 
 long_description = '''
 T-CorEx, Temporal Correlation Explanation, is designed for covariance estimation from temporal data.
-In its essense, T-CorEx trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
+In its essence, T-CorEx trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
 while employing two regularization techniques to enforce temporal consistency of estimates.
 T-CorEx has linear time and memory complexity with respect to the number of observed variables and can be applied to
 truly high-dimensional datasets. It takes less than an hour on a moderate PC to estimate the covariance structure
@@ -24,8 +24,7 @@ setup(name='T-CorEx',
       license='GNU Affero General Public License v3.0',
       install_requires=['numpy>=1.14.2',
                         'scipy>=1.1.0',
-                        'torch>=0.4.1',
-                        'scikit-learn>=0.20.0'],
+                        'torch>=0.4.1'],
       tests_require=['nose>=1.3.7',
                     'tqdm>=4.26'],
       classifiers=[
@@ -39,4 +38,4 @@ setup(name='T-CorEx',
           'Intended Audience :: Science/Research',
           'License :: OSI Approved :: GNU Affero General Public License v3'
       ],
-      packages=['tcorex'])
+      packages=['tcorex', 'tcorex.experiments'])

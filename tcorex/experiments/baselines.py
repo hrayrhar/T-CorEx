@@ -7,8 +7,6 @@ from subprocess import Popen, PIPE
 from tcorex.covariance import calculate_nll_score
 from .data import make_buckets
 
-import sklearn.decomposition as sk_dec
-import sklearn.covariance as sk_cov
 import numpy as np
 import time
 import itertools
@@ -174,6 +172,7 @@ class LedoitWolf(Baseline):
         super(LedoitWolf, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.covariance as sk_cov
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -193,6 +192,7 @@ class OAS(Baseline):
         super(OAS, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.covariance as sk_cov
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -212,6 +212,7 @@ class PCA(Baseline):
         super(PCA, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.decomposition as sk_dec
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -236,6 +237,7 @@ class SparsePCA(Baseline):
         super(SparsePCA, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.decomposition as sk_dec
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -272,6 +274,7 @@ class FactorAnalysis(Baseline):
         super(FactorAnalysis, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.decomposition as sk_dec
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
@@ -296,6 +299,7 @@ class GraphLasso(Baseline):
         super(GraphLasso, self).__init__(**kwargs)
 
     def _train(self, train_data, params, verbose):
+        import sklearn.covariance as sk_cov
         if verbose:
             print("Training {} ...".format(self.name))
         start_time = time.time()
