@@ -26,13 +26,14 @@ setup(name='T-CorEx',
                         'scipy>=1.1.0',
                         'torch>=0.4.1'],
       tests_require=['nose>=1.3.7',
-                    'tqdm>=4.26'],
+                     'tqdm>=4.26'],
       classifiers=[
           'Topic :: Scientific/Engineering :: Artificial Intelligence',
           'Topic :: Scientific/Engineering :: Information Analysis',
           'Topic :: Scientific/Engineering :: Mathematics',
           'Programming Language :: Python :: 3'
           'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 2'
           'Programming Language :: Python :: 2.7',
           'Intended Audience :: Science/Research',
