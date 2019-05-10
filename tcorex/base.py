@@ -175,12 +175,11 @@ class TCorexBase(object):
     def get_weights(self):
         return [to_numpy(w) for w in self.ws]
 
-    @property
     def mis(self):
         """ Returns I (Z_j : X_i) for each time period. """
         R = self.forward(self.x_input, 0, return_R=True)['R']
         R = [to_numpy(rho) for rho in R]
-        return [-0.5 * np.log1p(rho ** 2) for rho in R]
+        return [-0.5 * np.log1p(-rho ** 2) for rho in R]
 
     def clusters(self, cluster_type='MI'):
         """ Get clusters of variables for each time period.
@@ -189,7 +188,7 @@ class TCorexBase(object):
         """
         if cluster_type == 'W':
             return [np.abs(w).argmax(axis=0) for w in self.get_weights()]
-        return [mi.argmax(axis=0) for mi in self.mis]
+        return [mi.argmax(axis=0) for mi in self.mis()]
 
     def transform(self, x):
         """ Transform an array of inputs, x, into an array of k latent factors, Y. """

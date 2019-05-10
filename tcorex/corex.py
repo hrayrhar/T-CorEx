@@ -176,7 +176,7 @@ class Corex:
         """ Returns I (Z_j : X_i) """
         R = self.forward(self.x_input, 0)['R']
         R = base.to_numpy(R)
-        return -0.5 * np.log1p(R ** 2)
+        return -0.5 * np.log1p(-R ** 2)
 
     def clusters(self, cluster_type='MI'):
         """ Get clusters of variables.
@@ -185,7 +185,7 @@ class Corex:
         """
         if cluster_type == 'W':
             return np.abs(self.get_weights()).argmax(axis=0)
-        return self.mis.argmax(axis=0)
+        return self.mis().argmax(axis=0)
 
     def transform(self, x):
         """ Transform an array of inputs, x, into an array of k latent factors, Y. """
