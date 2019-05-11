@@ -67,7 +67,8 @@ class TCorexBase(object):
     """ Base class for all T-CorEx methods.
     """
     def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', pretrained_weights=None, device='cpu', stopping_len=50, verbose=0):
+                 gaussianize='standard', pretrained_weights=None, device='cpu', stopping_len=50, verbose=0,
+                 optimizer_class=torch.optim.Adam, optimizer_params={}):
         """
         :param nt: int, number of time periods
         :param nv: int, number of observed variables
@@ -81,6 +82,8 @@ class TCorexBase(object):
         :param device: str, 'cpu' or 'cuda'. The device parameter passed to PyTorch.
         :param stopping_len: int, the length of history used for detecting convergence.
         :param verbose: 0, 1, or 2. Specifies the verbosity level.
+        :param optimizer_class: optimizer class like torch.optim.Adam
+        :param optimizer_params: dictionary listing parameters of the optimizer
         """
         self.nt = nt
         self.nv = nv
@@ -94,6 +97,8 @@ class TCorexBase(object):
         self.device = torch.device(device)
         self.stopping_len = stopping_len
         self.verbose = verbose
+        self.optimizer_class = optimizer_class
+        self.optimizer_params = optimizer_params
         if verbose > 0:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
@@ -122,7 +127,7 @@ class TCorexBase(object):
             self.load_weights(self.pretrained_weights)
 
         # set up the optimizer
-        optimizer = torch.optim.Adam(self.ws + self.add_params)
+        optimizer = self.optimizer_class([self.ws], **self.optimizer_params)
 
         for eps in anneal_schedule:
             start_time = time.time()

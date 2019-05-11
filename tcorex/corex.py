@@ -29,7 +29,8 @@ class Corex:
     """ PyTorch implementation of Linear CorEx (https://arxiv.org/abs/1706.03353).
     """
     def __init__(self, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
-                 gaussianize='standard', l1=0.0, device='cpu', stopping_len=50, verbose=0):
+                 gaussianize='standard', l1=0.0, device='cpu', stopping_len=50, verbose=0,
+                 optimizer_class=torch.optim.Adam, optimizer_params={}):
         """
         :param nv: int, number of observed variables
         :param n_hidden: int, number of latent factors
@@ -42,6 +43,8 @@ class Corex:
         :param device: str, 'cpu' or 'cuda'. The device parameter passed to PyTorch.
         :param stopping_len: int, the length of history used for detecting convergence.
         :param verbose: 0, 1, or 2. Specifies the verbosity level.
+        :param optimizer_class: optimizer class like torch.optim.Adam
+        :param optimizer_params: dictionary listing parameters of the optimizer
         """
         self.nv = nv
         self.m = n_hidden
@@ -54,6 +57,8 @@ class Corex:
         self.device = torch.device(device)
         self.stopping_len = stopping_len
         self.verbose = verbose
+        self.optimizer_class = optimizer_class
+        self.optimizer_params = optimizer_params
         if verbose > 0:
             np.set_printoptions(precision=3, suppress=True, linewidth=160)
             print('Linear CorEx with {:d} latent factors'.format(n_hidden))
@@ -129,7 +134,7 @@ class Corex:
             anneal_schedule = [0.6 ** k for k in range(1, 7)] + [0]
 
         # set up the optimizer
-        optimizer = torch.optim.Adam([self.ws])
+        optimizer = self.optimizer_class([self.ws], **self.optimizer_params)
 
         for i_eps, eps in enumerate(anneal_schedule):
             start_time = time.time()

@@ -18,7 +18,8 @@ class TCorex(TCorexBase):
     """
     def __init__(self, nt, nv, n_hidden=10, max_iter=1000, tol=1e-5, anneal=True, missing_values=None,
                  gaussianize='standard', pretrained_weights=None, device='cpu', stopping_len=50, verbose=0,
-                 l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5, max_sample_cnt=2 ** 30, weighted_obj=False):
+                 l1=0.0, l2=0.0, reg_type='W', init=True, gamma=0.5, max_sample_cnt=2 ** 30, weighted_obj=False,
+                 optimizer_class=torch.optim.Adam, optimizer_params={}):
         """
         :param nt: int, number of time periods
         :param nv: int, number of observed variables
@@ -40,11 +41,14 @@ class TCorex(TCorexBase):
         :param max_sample_cnt: maximum number of samples to use. Small values give speed up, possibly
                                worsening the perforcmance.
         :param weighted_obj: boolean, whether to use weighted objective.
+        :param optimizer_class: optimizer class like torch.optim.Adam
+        :param optimizer_params: dictionary listing parameters of the optimizer
         """
         super(TCorex, self).__init__(nt=nt, nv=nv, n_hidden=n_hidden, max_iter=max_iter, tol=tol, anneal=anneal,
                                      missing_values=missing_values, gaussianize=gaussianize,
                                      pretrained_weights=pretrained_weights, device=device, stopping_len=stopping_len,
-                                     verbose=verbose)
+                                     verbose=verbose, optimizer_class=optimizer_class,
+                                     optimizer_params=optimizer_params)
         self.l1 = l1
         self.l2 = l2
         self.reg_type = reg_type
