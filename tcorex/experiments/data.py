@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 from sklearn.datasets import make_spd_matrix
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 import numpy as np
 import random
@@ -11,13 +12,23 @@ import pandas as pd
 import os
 
 
-def nglf_sufficient_params(nv, m, snr, min_std, max_std):
+def nglf_sufficient_params(nv, m, snr, min_std, max_std, is_snr_random=True,
+                           is_corr_sign_random=True):
     """ Generate parameters for p(x,z) joint model.
     """
     # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_std, max_std, size=(nv,))
-    cor_signs = np.sign(np.random.normal(size=(nv,)))
-    snrs = np.random.uniform(0, snr, size=(nv,))
+
+    if is_corr_sign_random:
+        cor_signs = np.sign(np.random.normal(size=(nv,)))
+    else:
+        cor_signs = np.ones((nv,))
+
+    if is_snr_random:
+        snrs = np.random.uniform(0, snr, size=(nv,))
+    else:
+        snrs = snr * np.ones((nv,))
+
     rhos = np.sqrt(snrs / (snrs + 1.0))
     cor = cor_signs * rhos
     par = [np.random.randint(0, m) for _ in range(nv)]
@@ -50,35 +61,113 @@ def sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix=True):
     else:
         # generates following the probabilistic graphical model
         def generate_single():
-            z = np.random.normal(0.0, 1.0, size=(m,))
+            z = np.random.normal(size=(m,))
             x = np.zeros((nv,))
             for i in range(nv):
                 cond_mean = cor[i] * x_std[i] * z[par[i]]
                 cond_var = (x_std[i] ** 2) * (1 - cor[i] ** 2)
                 x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
             return x
-        data = np.array([generate_single() for _ in range(ns)])
+        data = np.array([generate_single() for _ in tqdm(range(ns), desc='generating samples')])
         return data, None
 
 
-def generate_nglf(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False, from_matrix=True):
+def generate_nglf(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
+                  is_snr_random=True, is_corr_sign_random=True, from_matrix=True):
     """ Generates data according to an NGLF model.
 
-    :param nv:          Number of observed variables
-    :param m:           Number of latent factors
-    :param ns:          Number of samples
-    :param snr:         Average signal to noise ratio (U[0, snr])
-    :param min_std:     Minimum std of x_i
-    :param max_std:     Maximum std of x_i
-    :param shuffle:     Whether to shuffle to x_i's
-    :param from_matrix: Whether to construct and return ground truth covariance matrices
+    :param nv:            Number of observed variables
+    :param m:             Number of latent factors
+    :param ns:            Number of samples
+    :param snr:           Average signal to noise ratio (U[0, snr])
+    :param min_std:       Minimum std of x_i
+    :param max_std:       Maximum std of x_i
+    :param shuffle:       Whether to shuffle to x_i's
+    :param is_corr_sign_random: Whether to fix or randomize the correlation signs
+    :param is_snr_random: Whether to fix or randomize the signal-to-noise ratio
+    :param from_matrix:   Whether to construct and return ground truth covariance matrices
+
     :return: (data, ground_truth_cov)
     """
     block_size = nv // m
-    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std)
+    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std,
+                                             is_snr_random, is_corr_sign_random)
     if not shuffle:
         par = [i // block_size for i in range(nv)]
     return sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix)
+
+
+def generate_approximately_nglf(nv, m, ns, snr=5.0, num_extra_parents=0.1,
+                                num_correlated_zs=0, random_scale=False):
+    """ Generate approximately NGLF data (some x_i get more than one parent)
+    :param nv: number of observed variables
+    :param m: number of latent variables
+    :param ns: number of samples
+    :param snr: signal-to-noise ratio of the z_parent -> x_i channel
+    :param num_extra_parents: average number of extra parents
+    :param num_correlated_zs: number of zs each z_i is correlated with (besides z_i itself)
+    :param random_scale: whether to make the scales of each x_i random numbers
+    :return data, None
+
+    NOTE: std(x_i) = 1 (unless random_scale=True); snr is fixed; x_i are not shuffled;
+          correlation signs are fixed.
+    """
+    rho_total = np.sqrt(snr / (snr + 1.0))  # correlation of x_i and its main parent
+    block_size = nv // m
+    parents = [[i // block_size] for i in range(nv)]
+
+    # create extra parents
+    num_noisy_conn = int(num_extra_parents * nv)
+    noisy_xi = np.random.choice(nv, size=(num_noisy_conn,), replace=True)
+    for i in noisy_xi:
+        while True:
+            j = np.random.choice(m)
+            # accept if j is different than the main parent
+            if j != parents[i][0]:
+                parents[i].append(j)
+                break
+
+    # create the matrix that correlates z
+    z_transform_matrix = np.zeros((m, m))
+    for i in range(m):
+        others = np.random.choice(m, num_correlated_zs, replace=True)
+        # 2t variance for the main z_i and t variance for each other z
+        t = 1.0 / (2 + num_correlated_zs)
+        z_transform_matrix[i, i] = np.sqrt(2 * t)
+        for j in others:
+            z_transform_matrix[i, j] += np.sqrt(t)
+
+    # generates following the probabilistic graphical model
+    def generate_single():
+        z = np.random.normal(size=(m,))
+        z = np.dot(z_transform_matrix, z)
+        x = np.zeros((nv,))
+        for i in range(nv):
+            main_parent = parents[i][0]
+            noisy_parents = parents[i][1:]
+
+            # 2t with the main parent, 1t with other parts
+            delta2 = (rho_total**2) / (len(noisy_parents) + 2.0)
+
+            cond_mean = np.sqrt(2 * delta2) * z[main_parent]
+            for j in noisy_parents:
+                cond_mean += np.sqrt(delta2) * z[j]
+
+            cond_var = (1 - rho_total**2)
+
+            x[i] = np.random.normal(cond_mean, np.sqrt(cond_var))
+
+        return x
+
+    data = np.array([generate_single() for _ in tqdm(range(ns), desc='generating samples')])
+
+    if random_scale:
+        scales = 2 ** np.random.normal(size=(nv,))
+    else:
+        scales = np.ones(nv)
+    data *= scales.reshape((1, nv))
+
+    return data, None
 
 
 def generate_general(nv, m, ns, normalize=False, shuffle=False):
