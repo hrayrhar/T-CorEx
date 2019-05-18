@@ -187,12 +187,7 @@ class TCorexBase(object):
         return [-0.5 * np.log1p(-rho ** 2) for rho in R]
 
     def clusters(self, cluster_type='MI'):
-        """ Get clusters of variables for each time period.
-        :param cluster_type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
-                             In case of W, the cluster is defined as argmax_j |W_{j,i}|
-        """
-        if cluster_type == 'W':
-            return [np.abs(w).argmax(axis=0) for w in self.get_weights()]
+        """ Get clusters of variables for each time period. """
         return [mi.argmax(axis=0) for mi in self.mis()]
 
     def transform(self, x):

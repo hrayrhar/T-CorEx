@@ -183,13 +183,8 @@ class Corex:
         R = base.to_numpy(R)
         return -0.5 * np.log1p(-R ** 2)
 
-    def clusters(self, cluster_type='MI'):
-        """ Get clusters of variables.
-        :param cluster_type: MI or W. In case of MI, the cluster is defined as argmax_j I(x_i : z_j).
-                             In case of W, the cluster is defined as argmax_j |W_{j,i}|
-        """
-        if cluster_type == 'W':
-            return np.abs(self.get_weights()).argmax(axis=0)
+    def clusters(self):
+        """ Get clusters of variables. """
         return self.mis().argmax(axis=0)
 
     def transform(self, x):
