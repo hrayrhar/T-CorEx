@@ -127,7 +127,7 @@ class TCorexBase(object):
             self.load_weights(self.pretrained_weights)
 
         # set up the optimizer
-        optimizer = self.optimizer_class([self.ws], **self.optimizer_params)
+        optimizer = self.optimizer_class(self.ws, **self.optimizer_params)
 
         for eps in anneal_schedule:
             start_time = time.time()
