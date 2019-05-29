@@ -231,5 +231,10 @@ class Corex:
             return sigma
         return self.theta[1][:, np.newaxis] * self.theta[1] * sigma
 
+    def get_factorization(self):
+        factorization = self.forward(self.x_input, 0, return_factorization=True)['factorization']
+        factorization = base.to_numpy(factorization)
+        return factorization
+
     def load_weights(self, w):
         self.ws = torch.tensor(w, dtype=torch.float, device=self.device, requires_grad=True)
