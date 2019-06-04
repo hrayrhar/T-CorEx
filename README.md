@@ -1,10 +1,9 @@
 # T-CorEx
-
-T-CorEx, Temporal Correlation Explanation, is designed for covariance estimation from temporal data.
-In its essence, T-CorEx trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
+Official implementation of temporal correlation explanation (T-CorEx) method introduced in the paper "Efficient Covariance Estimation from Temporal Data" by Hrayr Harutunyan, Daniel Moyer, Hrant Khachatrian, Greg Ver Steeg, and Aram Galstyan ([arXiv](https://arxiv.org/abs/1905.13276)).
+T-CorEx is a method for covariance estimation from temporal data.
+It trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
 while employing two regularization techniques to enforce temporal consistency of estimates.
-T-CorEx has linear time and memory complexity with respect to the number of observed variables and can be applied to
-truly high-dimensional datasets. It takes less than an hour on a moderate PC to estimate the covariance structure
+T-CorEx has linear time and memory complexity with respect to the number of observed variables and can be applied to high-dimensional datasets. It takes less than an hour on a moderate PC to estimate the covariance structure
 for time series with 100K variables. T-CorEx is implemented in PyTorch and can run on both CPUs and GPUs.
 
 ## Requiremenets
