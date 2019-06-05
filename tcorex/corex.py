@@ -181,6 +181,8 @@ class Corex:
         """ Returns I (Z_j : X_i) """
         R = self.forward(self.x_input, 0)['R']
         R = base.to_numpy(R)
+        eps = 1e-6
+        R = np.clip(R, -1 + eps, 1 - eps)
         return -0.5 * np.log1p(-R ** 2)
 
     def clusters(self):

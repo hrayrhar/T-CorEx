@@ -184,6 +184,8 @@ class TCorexBase(object):
         """ Returns I (Z_j : X_i) for each time period. """
         R = self.forward(self.x_input, 0, return_R=True)['R']
         R = [to_numpy(rho) for rho in R]
+        eps = 1e-6
+        R = [np.clip(rho, -1 + eps, 1 - eps) for rho in R]
         return [-0.5 * np.log1p(-rho ** 2) for rho in R]
 
     def clusters(self, cluster_type='MI'):
