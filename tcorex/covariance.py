@@ -141,13 +141,50 @@ def _compute_diff_norm_fro(A, d_1, B, d_2):
 
 
 def frob_diffs_given_factors(factors):
-    """ Given the low-rank parts of correlation matrices, compute Frobenius norm of differences of inverse
-    correlation matrices of neighboring time steps.
+    """ Given the low-rank parts of correlation matrices, compute Frobenius norm of
+    differences of inverse correlation matrices of neighboring time steps.
     """
     B, d_inv = _compute_inverses(factors)
     nt = len(factors)
-    diff = [None] * (nt-1)
+    diff = [None] * (nt - 1)
     for t in range(nt - 1):
         print("Calculating Frobenius norm of difference at time step: {}".format(t))
         diff[t] = _compute_diff_norm_fro(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
     return diff
+
+
+def _compute_diff_row_norms(A, d1, B, d2):
+    """ Given two low-rank plus diagonal matrices, compute the 2-norm of all
+    rows of the difference of those matrices. Total complexity: O(m^2 n).
+    """
+    m, n = A.shape
+    norms = np.zeros(n, dtype=np.float)
+
+    # dome some once, complexity: O(m^2 n)
+    AAT = np.dot(A, A.T)
+    BBT = np.dot(B, B.T)
+    ABT = np.dot(A, B.T)
+
+    for i in range(n):
+        d_term = (d1[i] - d2[i]) ** 2
+        cross_term = (d1[i] - d2[i]) * (np.sum(A[:, i]**2) - np.sum(B[:, i]**2))
+        ab_term = np.dot(np.dot(A[:, i:i+1].T, AAT), A[:, i:i+1])[0, 0]\
+            - 2 * np.dot(np.dot(A[:, i:i+1].T, ABT), B[:, i:i+1])[0, 0]\
+            + np.dot(np.dot(B[:, i:i+1].T, BBT), B[:, i:i+1])[0, 0]
+        norms[i] = d_term + 2 * cross_term + ab_term
+
+    return np.sqrt(norms)
+
+
+def compute_diff_row_norms(factors):
+    """ Given the low-rank parts of correlation matrices, compute the 2-norm of all
+    rows of the difference of inverse correlation matrices of neighboring time steps.
+    Total complexity: O(T m^2 n).
+    """
+    B, d_inv = _compute_inverses(factors)
+    nt = len(factors)
+    row_norms = [None] * (nt - 1)
+    for t in range(nt - 1):
+        print("Calculating row norms of difference matrix at time step: {}".format(t))
+        row_norms[t] = _compute_diff_row_norms(B[t], d_inv[t], B[t+1], d_inv[t+1])
+    return row_norms
