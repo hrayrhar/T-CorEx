@@ -113,16 +113,20 @@ def _estimate_diff_norm(A_1, d_1, A_2, d_2, n_iters=300):
     return ret
 
 
-def spectral_diffs_given_factors(factors):
-    """ Given the low-rank parts of correlation matrices, compute spectral norm of differences of inverse
-    correlation matrices of neighboring time steps.
+def spectral_diffs_given_factors(factors, inverse=True):
+    """ Given the low-rank parts of correlation matrices, compute spectral norm of differences of
+    correlation/precision matrices of neighboring time steps.
     """
-    B, d_inv = _compute_inverses(factors)
-    nt = len(factors)
+    if inverse:
+        A, d = _compute_inverses(factors)
+    else:
+        A = factors
+        d = [np.ones(At.shape[1]) - np.diagonal(At) for At in A]
+    nt = len(A)
     diff = [None] * (nt-1)
     for t in range(nt - 1):
         print("Estimating norm of difference at time step: {}".format(t))
-        diff[t] = _estimate_diff_norm(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
+        diff[t] = _estimate_diff_norm(A[t], d[t], A[t + 1], d[t + 1])
     return diff
 
 
@@ -140,16 +144,20 @@ def _compute_diff_norm_fro(A, d_1, B, d_2):
     return np.sqrt(ret)
 
 
-def frob_diffs_given_factors(factors):
+def frob_diffs_given_factors(factors, inverse=True):
     """ Given the low-rank parts of correlation matrices, compute Frobenius norm of
-    differences of inverse correlation matrices of neighboring time steps.
+    differences of correlation/precision matrices of neighboring time steps.
     """
-    B, d_inv = _compute_inverses(factors)
-    nt = len(factors)
+    if inverse:
+        A, d = _compute_inverses(factors)
+    else:
+        A = factors
+        d = [np.ones(At.shape[1]) - np.diagonal(At) for At in A]
+    nt = len(A)
     diff = [None] * (nt - 1)
     for t in range(nt - 1):
         print("Calculating Frobenius norm of difference at time step: {}".format(t))
-        diff[t] = _compute_diff_norm_fro(B[t], d_inv[t], B[t + 1], d_inv[t + 1])
+        diff[t] = _compute_diff_norm_fro(A[t], d[t], A[t + 1], d[t + 1])
     return diff
 
 
@@ -176,15 +184,19 @@ def _compute_diff_row_norms(A, d1, B, d2):
     return np.sqrt(norms)
 
 
-def compute_diff_row_norms(factors):
-    """ Given the low-rank parts of correlation matrices, compute the 2-norm of all
-    rows of the difference of inverse correlation matrices of neighboring time steps.
+def compute_diff_row_norms(factors, inverse=True):
+    """ Given the low-rank parts of correlation matrices, compute the 2-norm of all rows
+    of the difference of inverse correlation/precision matrices of neighboring time steps.
     Total complexity: O(T m^2 n).
     """
-    B, d_inv = _compute_inverses(factors)
-    nt = len(factors)
+    if inverse:
+        A, d = _compute_inverses(factors)
+    else:
+        A = factors
+        d = [np.ones(At.shape[1]) - np.diagonal(At) for At in A]
+    nt = len(A)
     row_norms = [None] * (nt - 1)
     for t in range(nt - 1):
         print("Calculating row norms of difference matrix at time step: {}".format(t))
-        row_norms[t] = _compute_diff_row_norms(B[t], d_inv[t], B[t+1], d_inv[t+1])
+        row_norms[t] = _compute_diff_row_norms(A[t], d[t], A[t+1], d[t+1])
     return row_norms
