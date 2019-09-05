@@ -38,7 +38,7 @@ The code is shown below:
 from __future__ import print_function
 from __future__ import absolute_import
 
-from tcorex.experiments.data import load_nglf_sudden_change
+from tcorex.experiments.data import load_modular_sudden_change
 from tcorex.experiments import baselines
 from tcorex import base
 from tcorex import TCorex
@@ -58,13 +58,13 @@ def main():
     val_cnt = 4     # number of validation samples for each time period
 
     # Generate some data with a sudden change in the middle.
-    data, ground_truth_sigma = load_nglf_sudden_change(nv=nv, m=m, nt=nt, ns=(train_cnt + val_cnt))
+    data, ground_truth_sigma = load_modular_sudden_change(nv=nv, m=m, nt=nt, ns=(train_cnt + val_cnt))
 
     # Split it into train and validation.
     train_data = [X[:train_cnt] for X in data]
     val_data = [X[train_cnt:] for X in data]
 
-    # NOTE: the load_nglf_sudden_change function above creates data where the time axis
+    # NOTE: the load_modular_sudden_change function above creates data where the time axis
     # is already divided into time periods. If your data is not divided into time periods
     # you can use the following procedure to do that:
     # bucketed_data, index_to_bucket = make_buckets(data, window=train_cnt + val_cnt, stride='full')

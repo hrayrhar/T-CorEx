@@ -2,7 +2,7 @@ from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
 
-from tcorex.experiments.data import load_nglf_smooth_change
+from tcorex.experiments.data import load_modular_smooth_change
 from tcorex.experiments.misc import make_sure_path_exists
 from tcorex.experiments import baselines
 from tcorex import TCorex, TCorexLearnable
@@ -25,8 +25,8 @@ def main():
     parser.add_argument('--min_std', type=float, default=0.25, help='minimum x-std')
     parser.add_argument('--max_std', type=float, default=4.0, help='maximum x-std')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
-    parser.add_argument('--data_type', dest='data_type', action='store', default='nglf',
-                        choices=['nglf', 'general', 'sparse'], help='which dataset to load/create')
+    parser.add_argument('--data_type', dest='data_type', action='store', default='modular',
+                        choices=['modular', 'general', 'sparse'], help='which dataset to load/create')
     parser.add_argument('--output_dir', type=str, default='outputs/quantitative/')
     parser.add_argument('--n_segments', type=int, default=1)
     parser.add_argument('--left', type=int, default=0)
@@ -37,11 +37,11 @@ def main():
     print(args)
 
     ''' Load data '''
-    if args.data_type == 'nglf':
-        (data, ground_truth_covs) = load_nglf_smooth_change(nv=args.nv, m=args.m, nt=args.nt,
-                                                            ns=args.train_cnt + args.val_cnt + args.test_cnt,
-                                                            snr=args.snr, min_std=args.min_std, max_std=args.max_std,
-                                                            n_segments=args.n_segments, seed=args.seed)
+    if args.data_type == 'modular':
+        (data, ground_truth_covs) = load_modular_smooth_change(nv=args.nv, m=args.m, nt=args.nt,
+                                                               ns=args.train_cnt + args.val_cnt + args.test_cnt,
+                                                               snr=args.snr, min_std=args.min_std, max_std=args.max_std,
+                                                               n_segments=args.n_segments, seed=args.seed)
     else:
         raise ValueError("data_type={} is not implemented yet.".format(args.data_type))
     train_data = [x[:args.train_cnt] for x in data]

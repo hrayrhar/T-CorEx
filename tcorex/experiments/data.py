@@ -12,11 +12,10 @@ import pandas as pd
 import os
 
 
-def nglf_sufficient_params(nv, m, snr, min_std, max_std, is_snr_random=True,
-                           is_corr_sign_random=True):
-    """ Generate parameters for p(x,z) joint model.
+def modular_sufficient_params(nv, m, snr, min_std, max_std, is_snr_random=True,
+                              is_corr_sign_random=True):
+    """ Generate sufficient parameters for p(x,z) modular latent factor model.
     """
-    # NOTE: as z_std doesn't matter, we will set it 1.
     x_std = np.random.uniform(min_std, max_std, size=(nv,))
 
     if is_corr_sign_random:
@@ -35,8 +34,8 @@ def nglf_sufficient_params(nv, m, snr, min_std, max_std, is_snr_random=True,
     return x_std, cor, par
 
 
-def nglf_matrix_from_params(x_std, cor, par):
-    """ Construct the covariance matrix corresponding to an NGLF model.
+def modular_matrix_from_params(x_std, cor, par):
+    """ Construct the covariance matrix corresponding to a modular latent factor model.
     """
     nv = len(x_std)
     S = np.zeros((nv, nv))
@@ -51,11 +50,11 @@ def nglf_matrix_from_params(x_std, cor, par):
     return S
 
 
-def sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix=True):
-    """ Sample ns from an NGLF model.
+def sample_from_modular(nv, m, x_std, cor, par, ns, from_matrix=True):
+    """ Sample ns from a modular latent factor model.
     """
     if from_matrix:
-        sigma = nglf_matrix_from_params(x_std, cor, par)
+        sigma = modular_matrix_from_params(x_std, cor, par)
         myu = np.zeros((nv,))
         return np.random.multivariate_normal(myu, sigma, size=(ns,)), sigma
     else:
@@ -72,9 +71,9 @@ def sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix=True):
         return data, None
 
 
-def generate_nglf(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
-                  is_snr_random=True, is_corr_sign_random=True, from_matrix=True):
-    """ Generates data according to an NGLF model.
+def generate_modular(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
+                     is_snr_random=True, is_corr_sign_random=True, from_matrix=True):
+    """ Generates data according to a modular latent factor model.
 
     :param nv:            Number of observed variables
     :param m:             Number of latent factors
@@ -90,16 +89,16 @@ def generate_nglf(nv, m, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
     :return: (data, ground_truth_cov)
     """
     block_size = nv // m
-    x_std, cor, par = nglf_sufficient_params(nv, m, snr, min_std, max_std,
-                                             is_snr_random, is_corr_sign_random)
+    x_std, cor, par = modular_sufficient_params(nv, m, snr, min_std, max_std,
+                                                is_snr_random, is_corr_sign_random)
     if not shuffle:
         par = [i // block_size for i in range(nv)]
-    return sample_from_nglf(nv, m, x_std, cor, par, ns, from_matrix)
+    return sample_from_modular(nv, m, x_std, cor, par, ns, from_matrix)
 
 
-def generate_approximately_nglf(nv, m, ns, snr=5.0, num_extra_parents=0.1,
-                                num_correlated_zs=0, random_scale=False):
-    """ Generate approximately NGLF data (some x_i get more than one parent)
+def generate_approximately_modular(nv, m, ns, snr=5.0, num_extra_parents=0.1,
+                                   num_correlated_zs=0, random_scale=False):
+    """ Generate data from an approximately modular latent factor model.
     :param nv: number of observed variables
     :param m: number of latent variables
     :param ns: number of samples
@@ -205,20 +204,19 @@ def generate_general(nv, m, ns, normalize=False, shuffle=False):
     return np.random.multivariate_normal(mu, sigma, size=(ns,)), sigma
 
 
-def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
-                            from_matrix=True, n_segments=2, seed=42):
+def load_modular_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, shuffle=False,
+                               from_matrix=True, n_segments=2, seed=42):
     """ Generate data for the synthetic experiment with sudden change.
 
     :param nv:          Number of observed variables
     :param m:           Number of latent factors
     :param nt:          Number of time steps
-    :param ns:      Number of samples for each time step
+    :param ns:          Number of samples for each time step
     :param snr:         Average signal to noise ratio (U[0, snr])
     :param min_std:     Minimum std of x_i
     :param max_std:     Maximum std of x_i
     :param shuffle:     Whether to shuffle to x_i's
     :param from_matrix: Whether to construct and return ground truth covariance matrices
-                        Valid only when nglf=True
     :param n_segments:  Number of segments with constant cov. matrix
     :param seed:        Seed for np.random and random
     :return: (train_data, val_data, test_data, ground_truth_covs)
@@ -232,13 +230,13 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     data = []
     ground_truth_covs = []
     for seg_id in range(n_segments):
-        # make sure each time we generate the same nglf model
+        # make sure each time we generate the same model
         random.seed(seed + seg_id)
         np.random.seed(seed + seg_id)
         # generate for the current segment
         cur_ns = segment_lens[seg_id] * ns
-        cur_data, cur_sigma = generate_nglf(nv=nv, m=m, ns=cur_ns, snr=snr, min_std=min_std, max_std=max_std,
-                                            shuffle=shuffle, from_matrix=from_matrix)
+        cur_data, cur_sigma = generate_modular(nv=nv, m=m, ns=cur_ns, snr=snr, min_std=min_std, max_std=max_std,
+                                               shuffle=shuffle, from_matrix=from_matrix)
         cur_data = cur_data.reshape((segment_lens[seg_id], ns, nv))
         data += list(cur_data)
         ground_truth_covs += [cur_sigma] * segment_lens[seg_id]
@@ -246,8 +244,8 @@ def load_nglf_sudden_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, s
     return data, ground_truth_covs
 
 
-def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n_segments=2, seed=42):
-    """ Generates data for the synthetic experiment with smooth varying NGLF model.
+def load_modular_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n_segments=2, seed=42):
+    """ Generates data for the synthetic experiment with smooth change.
 
     :param nv:      Number of observed variables
     :param m:       Number of latent factors
@@ -267,16 +265,16 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
     segment_lens = [nt // n_segments for _ in range(n_segments)]
     segment_lens[-1] += nt - sum(segment_lens)
     assert(sum(segment_lens) == nt)
-    nglfs = [nglf_sufficient_params(nv, m, snr, min_std, max_std)
-             for _ in range(n_segments + 1)]
+    modular_models = [modular_sufficient_params(nv, m, snr, min_std, max_std)
+                      for _ in range(n_segments + 1)]
 
     # generate the data
     ground_truth = []
     data = np.zeros((nt, ns, nv))
     t = 0
     for seg_id in range(n_segments):
-        x_std_1, cor_1, par_1 = nglfs[seg_id]
-        x_std_2, cor_2, par_2 = nglfs[seg_id + 1]
+        x_std_1, cor_1, par_1 = modular_models[seg_id]
+        x_std_2, cor_2, par_2 = modular_models[seg_id + 1]
         L = segment_lens[seg_id]
 
         # choose where to change the parent of each x_i
@@ -293,7 +291,7 @@ def load_nglf_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0, n
             alpha = np.float(st) / L
             x_std = (1 - alpha) * x_std_1 + alpha * x_std_2
             cor = (1 - alpha) * cor_1 + alpha * cor_2
-            sigma = nglf_matrix_from_params(x_std, cor, par)
+            sigma = modular_matrix_from_params(x_std, cor, par)
 
             # generate data for a single time step
             ground_truth.append(sigma)

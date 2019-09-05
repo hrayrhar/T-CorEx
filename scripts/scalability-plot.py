@@ -1,7 +1,7 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
-from tcorex.experiments.data import load_nglf_sudden_change
+from tcorex.experiments.data import load_modular_sudden_change
 from tcorex.experiments import baselines
 from tcorex.experiments.misc import make_sure_path_exists
 from tcorex import TCorex
@@ -91,8 +91,8 @@ def main():
         n_hidden = nv // bs
 
         # generate data
-        data, _, = load_nglf_sudden_change(nv=nv, m=n_hidden, nt=args.nt, ns=args.train_cnt,
-                                           shuffle=False, from_matrix=False)
+        data, _, = load_modular_sudden_change(nv=nv, m=n_hidden, nt=args.nt, ns=args.train_cnt,
+                                              shuffle=False, from_matrix=False)
 
         for method, params in methods[:-2]:
             # start timing
