@@ -1,6 +1,6 @@
 numpy>=1.14.2
 scipy>=1.1.0
-torch>=0.4.1
+torch>=1.0
 nose>=1.3.7
 tqdm>=4.26
 linearcorex==0.52

@@ -1,29 +1,75 @@
-# T-CorEx
-Official implementation of temporal correlation explanation (T-CorEx) method introduced in the paper *"Efficient Covariance Estimation from Temporal Data"* by Hrayr Harutunyan, Daniel Moyer, Hrant Khachatrian, Greg Ver Steeg, and Aram Galstyan ([arXiv](https://arxiv.org/abs/1905.13276)).
-T-CorEx is a method for covariance estimation from temporal data.
-It trains a [linear CorEx](https://arxiv.org/abs/1706.03353) for each time period,
-while employing two regularization techniques to enforce temporal consistency of estimates.
-T-CorEx has linear time and memory complexity with respect to the number of observed variables and can be applied to high-dimensional datasets. It takes less than an hour on a moderate PC to estimate the covariance structure
-for time series with 100K variables. T-CorEx is implemented in PyTorch and can run on both CPUs and GPUs.
+# Correlation Explanation Methods
+Official implementation of linear correlation explanation (linear CorEx) and temporal correlation explanation (T-CorEx) methods.
 
-## Requiremenets
+#### Linear CorEx
+Linear CorEx searches for independent latent factors that explain all correlations between observed variables, while also biasing
+the model selection towards modular latent factor models – directed latent factor graphical models
+where each observed variable has a single latent variable as its only parent.
+This is useful for covariance estimation, clustering related variables, and dimensionality reduction, especially in the high-dimensional and under-sampled regime.
+The complete description of the method is presented in NeurIPS 2019 [paper](https://arxiv.org/abs/1706.03353) *"Fast structure learning with modular regularization"* by Greg Ver Steeg, Hrayr Harutyunyan, Daniel Moyer, and Aram Galstyan.
+If you want to cite this paper, please use the following BibTex entry:
+```text
+@article{linearcorex,
+  title={Fast structure learning with modular regularization},
+  author={Steeg, Greg Ver and Harutyunyan, Hrayr and Moyer, Daniel and Galstyan, Aram},
+  journal={arXiv preprint arXiv:1706.03353},
+  year={2019}
+}
+```
+
+**Note:** Greg Ver Steeg has an alternative implementation of linear CorEx, which is available at [github.com/gregversteeg/LinearCorex](https://github.com/gregversteeg/LinearCorex).
+That implementation uses a quazi-Newton optimization method for learning the model parameters. 
+In contrast, the implementation provided in this repository uses ADAM optimizer.
+This latter implementation utilizes GPUs better, and can converge to slightly better objective values if the input data is highly non-modular.
+Nevertheless, we highly encourage to take a look at the alternative implementation.
+
+#### T-CorEx
+T-CorEx is a method for covariance estimation from temporal data.
+It trains a linear CorEx for each time period,
+while employing two regularization techniques to enforce temporal consistency of estimates.
+The method is introduced in the [paper](https://arxiv.org/abs/1905.13276) *"Efficient Covariance Estimation from Temporal Data"* by Hrayr Harutunyan, Daniel Moyer, Hrant Khachatrian, Greg Ver Steeg, and Aram Galstyan.
+If you want to cite this paper, please use the following BibTex entry:
+```text
+@article{tcorex,
+  title={Efficient Covariance Estimation from Temporal Data},
+  author={Harutyunyan, Hrayr and Moyer, Daniel and Khachatrian, Hrant and Steeg, Greg Ver and Galstyan, Aram},
+  journal={arXiv preprint arXiv:1905.13276},
+  year={2019}
+}
+```
+
+
+Both linear CorEx and T-CorEx have linear time and memory complexity with respect to the number of observed variables and can be applied to high-dimensional datasets.
+For example, it takes less than an hour on a moderate PC to estimate the covariance structure for time series with 100K variables using T-CorEx.
+Both methods are implemented in PyTorch and can run on CPUs and GPUs.
+
+
+## Requirements and Installation
+The code is writen in Python 3, but should run on Python 2 as well.
+The dependencies are the following: 
 * numpy, scipy, tqdm, PyTorch
 * [optional] nibabel (for fMRI experiments)
 * [optional] nose (for tests)
 * [optional] sklearn, regain, TVGL, linearcorex, pandas (for running comparisions)
 * [optional] matplotlib and nilearn (for visualizations)
 
-## Description
+To install the code, run the following command:
+```text
+python setup.py install
+```
 
-The main method is the class 'tcorex.TCorex'. The description of its paramteres can be found in the docstring.
-While there are many hyperparameters, in general only a couple of them need to be tuned (others are set to their "best" values).
+## Description
+The main method for linear CorEx is the class `tcorex.Corex`, and that of T-CorEx is 'tcorex.TCorex'.
+The complete description of parameters of these classes can be found in the corresponding docstrings.
+While there are many parameters (especially for T-CorEx), in general only a couple of them need to be tuned (others are set to their "best" values).
 Those parameters are:
 
-| parameter | description |  
-|:---------|:---|  
-| `l1` | A non-negative real number specifying the coefficient of l1 temporal regularization.|  
-| `l2` | A non-negative real number specifying the coefficient of l2 temporal regularization.|  
-| `gamma` | A real number in [0,1]. This argument controls the sample weights. The samples of time period t' will have weight w_t(t')=gamma^\|t' - t\| when estimating quantities for time period t. Smaller values are used for very dynamic time series.|  
+
+| Parameter | Linear CorEx | T-CorEx | Description |    
+|:---------|---|---|:---|   
+| `m` | + | + | The number of latent variables. Usually this is much smaller than the number of observed variables. |  
+| `l1` | - | + | A non-negative real number specifying the coefficient of l1 temporal regularization.|  
+| `gamma` | - | + | A real number in [0,1]. This argument controls the sample weights. The samples of time period t' will have weight w_t(t')=gamma^\|t' - t\| when estimating quantities for time period t. Smaller values are used for very dynamic time series.|  
 
 
 ## Usage
