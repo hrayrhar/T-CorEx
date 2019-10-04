@@ -303,7 +303,8 @@ def load_modular_smooth_change(nv, m, nt, ns, snr=5.0, min_std=0.25, max_std=4.0
 
 
 def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='2018-01-01',
-               commodities=False, log_return=True, noise_var=1e-4, return_index=False, seed=42):
+               commodities=False, log_return=True, noise_var=1e-4, return_index=False,
+               standardize=True, seed=42):
     """ Loads S&P 500 data (optionally with commodity prices).
     If nt is None, all time windows will be returned, otherwise only the last nt time windows will be returned.
     """
@@ -311,7 +312,7 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='
     random.seed(seed)
 
     # load S&P 500 data
-    data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
+    data_dir = os.path.join(os.path.dirname(__file__), '../../data/trading_economics')
     assert('2000-01-01' <= start_date <= end_date <= '2018-06-01')
     df = pd.read_pickle(os.path.join(data_dir, 'sp500_2000-01-01-2018-06-01_raw.pkl'))
 
@@ -354,8 +355,9 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='
 
     # standardize the raw data
     X = np.array(df)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    if standardize:
+        scaler = StandardScaler()
+        X = scaler.fit_transform(X)
 
     # split the data into buckets, stride='full' otherwise the same sample can be both in train and val
     train_data = []
@@ -397,14 +399,14 @@ def load_sp500(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='
 
 
 def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01', end_date='2018-01-01',
-                           log_return=True, noise_var=1e-4, return_index=False, seed=42):
+                           log_return=True, noise_var=1e-4, return_index=False, standardize=True, seed=42):
     """ Loads full trading economics data.
     """
     np.random.seed(seed)
     random.seed(seed)
 
     # load trading economics data all stocks
-    data_dir = os.path.join(os.path.dirname(__file__), 'data/trading_economics')
+    data_dir = os.path.join(os.path.dirname(__file__), '../../data/trading_economics')
     assert('2000-01-01' <= start_date <= end_date <= '2018-06-01')
     df = pd.read_pickle(os.path.join(data_dir, 'trading_economics_all_stocks_raw.pkl'))
 
@@ -435,8 +437,9 @@ def load_trading_economics(train_cnt, val_cnt, test_cnt, start_date='2000-01-01'
 
     # standardize the raw data
     X = np.array(df)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    if standardize:
+        scaler = StandardScaler()
+        X = scaler.fit_transform(X)
 
     # split the data into buckets, stride='full' otherwise the same sample can be both in train and val
     train_data = []

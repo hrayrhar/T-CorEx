@@ -25,7 +25,7 @@ def main():
                         help='whether to take log returns or normal returns')
     parser.add_argument('--standard_return', dest='log_return', action='store_false')
     parser.add_argument('--start_date', type=str, default='2000-01-01')
-    parser.add_argument('--end_date', type=str, default='2018-01-01')
+    parser.add_argument('--end_date', type=str, default='2016-01-01')
     parser.add_argument('--noise_var', type=float, default=1e-4,
                         help='variance of Gaussian noise that will be added to time series')
     parser.add_argument('--prefix', type=str, default='', help='optional prefix of experiment name')
