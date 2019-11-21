@@ -6,14 +6,18 @@ Linear CorEx searches for independent latent factors that explain all correlatio
 the model selection towards modular latent factor models – directed latent factor graphical models
 where each observed variable has a single latent variable as its only parent.
 This is useful for covariance estimation, clustering related variables, and dimensionality reduction, especially in the high-dimensional and under-sampled regime.
-The complete description of the method is presented in NeurIPS 2019 [paper](https://arxiv.org/abs/1706.03353) *"Fast structure learning with modular regularization"* by Greg Ver Steeg, Hrayr Harutyunyan, Daniel Moyer, and Aram Galstyan.
+The complete description of the method is presented in NeurIPS 2019 [paper](https://papers.nips.cc/paper/9691-fast-structure-learning-with-modular-regularization) *"Fast structure learning with modular regularization"* by Greg Ver Steeg, Hrayr Harutyunyan, Daniel Moyer, and Aram Galstyan.
 If you want to cite this paper, please use the following BibTex entry:
 ```text
-@article{linearcorex,
-  title={Fast structure learning with modular regularization},
-  author={Steeg, Greg Ver and Harutyunyan, Hrayr and Moyer, Daniel and Galstyan, Aram},
-  journal={arXiv preprint arXiv:1706.03353},
-  year={2019}
+@incollection{NIPS2019_9691,
+title = {Fast structure learning with modular regularization},
+author = {Ver Steeg, Greg and Harutyunyan, Hrayr and Moyer, Daniel and Galstyan, Aram},
+booktitle = {Advances in Neural Information Processing Systems 32},
+editor = {H. Wallach and H. Larochelle and A. Beygelzimer and F. d\textquotesingle Alch\'{e}-Buc and E. Fox and R. Garnett},
+pages = {15567--15577},
+year = {2019},
+publisher = {Curran Associates, Inc.},
+url = {http://papers.nips.cc/paper/9691-fast-structure-learning-with-modular-regularization.pdf}
 }
 ```
 
