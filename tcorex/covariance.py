@@ -20,15 +20,20 @@ def calculate_nll_score(data, covs):
 
 
 def diffs(matrices, norm='fro'):
-    """ Computes the norms of differences of neighboring matrices.
+    """ Computes the norms of differences of neighboring matrices, and differences w.r.t matrix at time t=0
     :param matrices: list of matrices
     :param ord: variable that will be passed to np.linalg.norm
     """
     nt = len(matrices)
+    
     ret = []
-    for t in range(nt - 1):
-        ret.append(np.linalg.norm(matrices[t] - matrices[t+1], ord=norm))
-    return ret
+    ret_zero = []
+    
+    for t in range(0, nt - 1):
+        ret.append(np.linalg.norm(matrices[t+1] - matrices[t], ord=norm))
+        ret_zero.append(np.linalg.norm(matrices[t+1] - matrices[0], ord=norm))
+
+    return ret, ret_zero
 
 
 def reorder(mat, clusters):
